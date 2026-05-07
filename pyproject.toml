@@ -51,6 +51,7 @@ env = [
     "CORS_ORIGINS=[\"http://localhost:3000\"]",
     "REQUEST_TIMEOUT_SECONDS=30",
     "RATE_LIMIT_DEFAULT=1000/minute",
+    "DATABASE_URL=postgresql+asyncpg://test:test@localhost/test",
     "DATABASE_POOL_SIZE=2",
     "DATABASE_MAX_OVERFLOW=2",
     "DATABASE_POOL_TIMEOUT=10",
