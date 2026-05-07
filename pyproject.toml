@@ -41,6 +41,9 @@ include = ["src*"]
 asyncio_mode = "auto"
 pythonpath = ["."]
 testpaths = ["tests"]
+markers = [
+    "integration: requires a live database — run locally only",
+]
 env = [
     "APP_NAME=backend-core-test",
     "APP_VERSION=0.0.0",
