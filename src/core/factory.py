@@ -41,11 +41,9 @@ async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 def create_app() -> FastAPI:
     """Build and return the configured FastAPI application.
 
-    Args:
-        description (str): Short description about product.
-
     Returns:
         FastAPI: The assembled application instance.
+
     """
     app = FastAPI(
         title=app_settings.APP_NAME,

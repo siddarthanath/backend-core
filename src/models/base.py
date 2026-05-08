@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 # Third Party
+import sqlalchemy as sa
 from sqlmodel import Field, SQLModel
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
@@ -23,7 +24,10 @@ class TimestampMixin(SQLModel):
     """Adds created_at and updated_at timestamps to a table model."""
 
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column_kwargs={"onupdate": sa.func.now()},
+    )
 
 
 class SoftDeleteMixin(SQLModel):

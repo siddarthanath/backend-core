@@ -50,6 +50,8 @@ async def get_current_user(
             auth_settings.SUPABASE_JWT_SECRET,
             algorithms=["HS256"],
             audience="authenticated",
+            issuer=f"{auth_settings.SUPABASE_URL}/auth/v1",
+            leeway=10,
         )
     except jwt.ExpiredSignatureError:
         raise AuthException(message="Token expired")

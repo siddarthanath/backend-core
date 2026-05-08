@@ -16,7 +16,7 @@ class ErrorDetail(BaseModel):
 
     code: str
     message: str
-    detail: str | None
+    detail: object | None
     request_id: str | None
 
 
@@ -30,7 +30,7 @@ class ErrorEnvelope(BaseModel):
         cls,
         code: str,
         message: str,
-        detail: str | None = None,
+        detail: object | None = None,
     ) -> "ErrorEnvelope":
         """Build an envelope from exception fields, injecting the current request ID.
 
