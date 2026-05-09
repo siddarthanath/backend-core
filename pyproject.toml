@@ -22,6 +22,8 @@ dependencies = [
     "cryptography>=43.0.0",
     "alembic>=1.14.0",
     "python-dotenv>=1.0.0",
+    "supabase>=2.0.0",
+    "email-validator>=2.0.0",
 ]
 
 [project.optional-dependencies]
@@ -55,6 +57,7 @@ env = [
     "SUPABASE_URL=https://test.supabase.co",
     "SUPABASE_JWT_SECRET=test-secret",
     "SUPABASE_ANON_KEY=test-anon-key",
+    "SUPABASE_SERVICE_ROLE_KEY=test-service-role-key",
     "DATABASE_POOL_SIZE=2",
     "DATABASE_MAX_OVERFLOW=2",
     "DATABASE_POOL_TIMEOUT=10",

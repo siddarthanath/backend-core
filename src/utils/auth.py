@@ -1,32 +1,27 @@
-"""Exceptions package — typed exceptions, error envelope, and handler registration."""
+"""Auth utilities — Supabase admin client factory."""
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
+# Third Party
+from supabase import Client, create_client
+
 # Internal
-from src.core.exceptions.base import CoreException
-from src.core.exceptions.envelope import ErrorEnvelope
-from src.core.exceptions.handlers import add_exception_handlers
-from src.core.exceptions.types import (
-    AuthException,
-    ConflictError,
-    ExternalServiceError,
-    ForbiddenError,
-    NotFoundError,
-    RateLimitError,
-    ValidationError,
-)
+from src.configs.settings import auth_settings
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
-__all__ = [
-    "CoreException",
-    "ErrorEnvelope",
-    "add_exception_handlers",
-    "AuthException",
-    "ConflictError",
-    "ExternalServiceError",
-    "ForbiddenError",
-    "NotFoundError",
-    "RateLimitError",
-    "ValidationError",
-]
+
+def get_supabase_admin_client() -> Client:
+    """Return a Supabase client authenticated with the service role key.
+
+    Uses the service role key, not the anon key — only call from server-side code.
+    Never expose this client or its token to the frontend.
+
+    Returns:
+        Client: Supabase client with admin privileges.
+
+    """
+    return create_client(
+        auth_settings.SUPABASE_URL,
+        auth_settings.SUPABASE_SERVICE_ROLE_KEY,
+    )

@@ -6,13 +6,14 @@
 from fastapi import APIRouter
 
 # Internal
-from src.api.v1 import health
+from src.api.v1 import health, user
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
 router = APIRouter(prefix="/api/v1")
 
 router.include_router(health.router)
+router.include_router(user.router)
 
 # NOTE: Dynamic router auto-discovery (alternative pattern).
 # Instead of explicit includes above, routers can be discovered at startup via pkgutil.iter_modules
