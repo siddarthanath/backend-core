@@ -16,11 +16,11 @@ import anyio.to_thread
 # Internal
 from src.core.exceptions.types import ExternalServiceError
 from src.utils.auth import get_supabase_admin_client
-from src.utils.logging import setup_logger
+from src.utils.logging import get_logger
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
-logger = setup_logger(__name__)
+log = get_logger(__name__)
 
 
 class AuthService:
@@ -42,7 +42,7 @@ class AuthService:
                 lambda: client.auth.admin.delete_user(str(user_id))
             )
         except Exception as e:
-            logger.error("supabase_delete_user_failed", user_id=str(user_id), error=str(e))
+            log.error("supabase_delete_user_failed", user_id=str(user_id), error=str(e))
             raise ExternalServiceError("Supabase", str(e))
 
     async def send_password_reset(self, email: str) -> None:
@@ -61,7 +61,7 @@ class AuthService:
                 lambda: client.auth.admin.generate_link({"type": "recovery", "email": email})
             )
         except Exception as e:
-            logger.error("supabase_password_reset_failed", error=str(e))
+            log.error("supabase_password_reset_failed", error=str(e))
             raise ExternalServiceError("Supabase", str(e))
 
     async def update_email(self, user_id: uuid.UUID, new_email: str) -> None:
@@ -81,7 +81,7 @@ class AuthService:
                 lambda: client.auth.admin.update_user_by_id(str(user_id), {"email": new_email})
             )
         except Exception as e:
-            logger.error("supabase_update_email_failed", user_id=str(user_id), error=str(e))
+            log.error("supabase_update_email_failed", user_id=str(user_id), error=str(e))
             raise ExternalServiceError("Supabase", str(e))
 
     async def update_password(self, user_id: uuid.UUID, new_password: str) -> None:
@@ -101,5 +101,5 @@ class AuthService:
                 lambda: client.auth.admin.update_user_by_id(str(user_id), {"password": new_password})
             )
         except Exception as e:
-            logger.error("supabase_update_password_failed", user_id=str(user_id), error=str(e))
+            log.error("supabase_update_password_failed", user_id=str(user_id), error=str(e))
             raise ExternalServiceError("Supabase", str(e))

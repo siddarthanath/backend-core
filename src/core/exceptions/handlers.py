@@ -10,11 +10,11 @@ from fastapi.responses import JSONResponse
 # Internal
 from src.core.exceptions.base import CoreException
 from src.core.exceptions.envelope import ErrorEnvelope
-from src.utils.logging import setup_logger
+from src.utils.logging import get_logger
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
-logger = setup_logger(__name__)
+log = get_logger(__name__)
 
 
 async def _core_exception_handler(request: Request, exc: CoreException) -> JSONResponse:
@@ -32,7 +32,7 @@ async def _validation_exception_handler(request: Request, exc: RequestValidation
 
 
 async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.error("Unhandled exception: %s", exc, exc_info=True)
+    log.error("request.unhandled_exception", error=str(exc), exc_info=True)
     envelope = ErrorEnvelope.from_exception(
         code="INTERNAL_ERROR",
         message="An unexpected error occurred",

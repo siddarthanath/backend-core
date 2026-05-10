@@ -16,26 +16,24 @@ from src.core.exceptions import add_exception_handlers
 from src.core.middleware import add_middleware
 from src.core.registry import db_registry
 from src.services.sessions.database import DatabaseSession
-from src.utils.logging import setup_logger
+from src.utils.logging import configure_logging, get_logger
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
-logger = setup_logger(__name__)
+log = get_logger(__name__)
 
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    # Startup: initialise DB, register in registry
     db_session = DatabaseSession()
     db_session.initialise()
     db_registry.register(db_session, name="default")
-    logger.info("Application started — %s %s", app_settings.APP_NAME, app_settings.APP_VERSION)
+    log.info("app.started", name=app_settings.APP_NAME, version=app_settings.APP_VERSION)
 
     yield
 
-    # Shutdown: dispose engine, release pool connections
     await db_registry.get("default").close()
-    logger.info("Application stopped")
+    log.info("app.stopped")
 
 
 def create_app() -> FastAPI:
@@ -45,6 +43,8 @@ def create_app() -> FastAPI:
         FastAPI: The assembled application instance.
 
     """
+    configure_logging(debug=app_settings.DEBUG)
+
     app = FastAPI(
         title=app_settings.APP_NAME,
         version=app_settings.APP_VERSION,

@@ -1,34 +1,61 @@
-"""Logging utilities — stdlib for now, structlog in Round 3 (see backend-specs/08-utils.md)."""
+"""Logging — structlog with JSON (production) or coloured console (debug) output."""
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
 # Standard Library
 import logging
 
+# Third Party
+import structlog
+from structlog.types import Processor
+
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
 
-def setup_logger(name: str, level: int = logging.DEBUG) -> logging.Logger:
-    """Create and configure a logger with a given name.
+def configure_logging(*, debug: bool = False) -> None:
+    """Configure the structlog processor chain. Call once at application startup.
+
+    In debug mode: coloured, human-readable console output.
+    In production: JSON lines, one per log event.
+    request_id and user_id bound in middleware are automatically merged into
+    every log call within that request via merge_contextvars.
 
     Args:
-        name (str): Name of the logger (typically __name__ or class name).
-        level (int): Logging level (e.g., logging.DEBUG, logging.INFO).
-
-    Returns:
-        logging.Logger: Configured logger instance.
+        debug (bool): True for coloured console output, False for JSON lines.
 
     """
-    logger = logging.getLogger(name)
-    if logger.hasHandlers():
-        return logger
-    logger.setLevel(level)
-    handler = logging.StreamHandler()
-    handler.setLevel(level)
-    formatter = logging.Formatter(
-        "[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
+    shared: list[Processor] = [
+        structlog.contextvars.merge_contextvars,
+        structlog.stdlib.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+    ]
+
+    processors: list[Processor] = (
+        [*shared, structlog.dev.ConsoleRenderer()]
+        if debug
+        else [*shared, structlog.processors.ExceptionRenderer(), structlog.processors.JSONRenderer()]
     )
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    return logger
+
+    structlog.configure(
+        processors=processors,
+        wrapper_class=structlog.make_filtering_bound_logger(
+            logging.DEBUG if debug else logging.INFO
+        ),
+        context_class=dict,
+        logger_factory=structlog.PrintLoggerFactory(),
+        cache_logger_on_first_use=True,
+    )
+
+
+def get_logger(name: str) -> structlog.BoundLogger:
+    """Return a structlog bound logger for the given module.
+
+    Args:
+        name (str): Typically __name__ from the calling module.
+
+    Returns:
+        structlog.BoundLogger: A bound logger with the module name pre-bound.
+
+    """
+    return structlog.get_logger(name)

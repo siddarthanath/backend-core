@@ -6,6 +6,7 @@
 import jwt
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from structlog.contextvars import bind_contextvars
 
 # Internal
 from src.configs.settings import auth_settings
@@ -66,4 +67,6 @@ async def get_current_user(
         role=payload.get("role", "authenticated"),
     )
     set_request_user_id(claims.sub)
+    # Bind to user to flow into all downstream logs
+    bind_contextvars(user_id=claims.sub)
     return claims
