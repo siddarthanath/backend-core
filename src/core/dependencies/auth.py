@@ -41,7 +41,9 @@ async def get_current_user(
         AuthException: If the token is missing, expired, or invalid.
 
     """
-    # PROVIDER SWAP POINT: replace this block to change auth provider.
+    # PROVIDER SWAP POINT (backend)
+    # If/when you swap auth providers, you rewrite lib/supabase/client.ts (frontend) + this block —
+    # the rest of the app (repositories, services, endpoints) doesn't change.
     # Supabase uses HS256 + shared JWT secret. Auth0/Firebase use RS256 + JWKS endpoint —
     # swap algorithm, key source, and audience claim accordingly. UserClaims shape stays the same.
     try:
