@@ -28,6 +28,12 @@ def configure_logging(*, debug: bool = False) -> None:
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_log_level,
         structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.CallsiteParameterAdder(
+            [
+                structlog.processors.CallsiteParameter.FILENAME,
+                structlog.processors.CallsiteParameter.FUNC_NAME,
+            ]
+        ),
         structlog.processors.StackInfoRenderer(),
     ]
 
