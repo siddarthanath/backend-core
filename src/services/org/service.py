@@ -5,9 +5,6 @@
 # Standard Library
 import uuid
 
-# Third Party
-from sqlalchemy.ext.asyncio import AsyncSession
-
 # Internal
 from src.constants import MembershipStatus, Role
 from src.core.exceptions.types import ConflictError, ForbiddenError, NotFoundError
@@ -21,10 +18,45 @@ from src.repositories.user import UserRepository
 class OrgService:
     """Orchestrates org and membership operations. Raises typed exceptions, never HTTPException."""
 
-    def __init__(self, session: AsyncSession) -> None:
-        self.org_repo = OrgRepository(session)
-        self.membership_repo = MembershipRepository(session)
-        self.user_repo = UserRepository(session)
+    def __init__(
+        self,
+        org_repo: OrgRepository,
+        membership_repo: MembershipRepository,
+        user_repo: UserRepository,
+    ) -> None:
+        self.org_repo = org_repo
+        self.membership_repo = membership_repo
+        self.user_repo = user_repo
+
+    async def list_my_orgs(self, user_id: uuid.UUID) -> list[Organisation]:
+        """Return all orgs the user is an active member of.
+
+        Args:
+            user_id (uuid.UUID): The requesting user's UUID.
+
+        Returns:
+            list[Organisation]: Active orgs for this user.
+
+        """
+        return await self.org_repo.get_user_orgs(user_id)
+
+    async def list_members(self, org_id: uuid.UUID, user_id: uuid.UUID) -> list[Membership]:
+        """Return active members of an org. User must be a member.
+
+        Args:
+            org_id (uuid.UUID): The org's UUID.
+            user_id (uuid.UUID): The requesting user's UUID.
+
+        Raises:
+            NotFoundError: If the org does not exist.
+            ForbiddenError: If the user is not a member.
+
+        Returns:
+            list[Membership]: Active memberships for this org.
+
+        """
+        await self.get_org(org_id, user_id)
+        return await self.membership_repo.get_org_members(org_id)
 
     async def create_org(
         self,

@@ -10,7 +10,7 @@ from fastapi import APIRouter, Request
 
 # Internal
 from src.constants import Plan
-from src.core.dependencies import CurrentUserClaims, CurrentUserID, DBSession
+from src.core.dependencies import CurrentUserClaims, CurrentUserID, UserSvc
 from src.core.middleware.rate_limit import limiter
 from src.schemas.common import MessageResponse
 from src.schemas.user.requests import (
@@ -22,7 +22,6 @@ from src.schemas.user.requests import (
 )
 from src.schemas.user.responses import UserMeResponse, UserProfileResponse
 from src.services.auth.service import AuthService
-from src.services.user.service import UserService
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
@@ -34,7 +33,7 @@ router = APIRouter(prefix="/user", tags=["User"])
 async def get_me(
     request: Request,
     claims: CurrentUserClaims,
-    session: DBSession,
+    service: UserSvc,
 ) -> UserMeResponse:
     """Return the authenticated user's profile with billing and org context.
 
@@ -42,7 +41,6 @@ async def get_me(
 
     """
     user_id = uuid.UUID(claims.sub)
-    service = UserService(session)
     user = await service.get_or_create(user_id, email=claims.email)
     return UserMeResponse(
         id=user.id,
@@ -61,10 +59,9 @@ async def update_profile(
     request: Request,
     body: UpdateProfileRequest,
     user_id: CurrentUserID,
-    session: DBSession,
+    service: UserSvc,
 ) -> UserProfileResponse:
     """Update the authenticated user's display name."""
-    service = UserService(session)
     user = await service.update_profile(
         user_id,
         first_name=body.first_name,
@@ -123,16 +120,15 @@ async def delete_account(
     request: Request,
     body: DeleteAccountRequest,
     user_id: CurrentUserID,
-    session: DBSession,
+    service: UserSvc,
 ) -> MessageResponse:
     """Soft-delete UserProfile then hard-delete the Supabase auth user.
 
     body.confirmation must equal "DELETE MY ACCOUNT".
 
     """
-    user_service = UserService(session)
     auth_service = AuthService()
-    await user_service.delete(user_id)
+    await service.delete(user_id)
     await auth_service.delete_user(user_id)
     return MessageResponse(
         message="Account deleted.",

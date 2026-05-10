@@ -9,9 +9,8 @@ import uuid
 from fastapi import APIRouter, Request
 
 # Internal
-from src.core.dependencies import CurrentUserID, DBSession
+from src.core.dependencies import CurrentUserID, OrgSvc
 from src.core.middleware.rate_limit import limiter
-from src.repositories.org import MembershipRepository, OrgRepository
 from src.schemas.common import MessageResponse
 from src.schemas.org.requests import (
     CreateOrgRequest,
@@ -20,7 +19,6 @@ from src.schemas.org.requests import (
     UpdateOrgRequest,
 )
 from src.schemas.org.responses import MemberResponse, OrgResponse
-from src.services.org.service import OrgService
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
@@ -33,10 +31,9 @@ async def create_org(
     request: Request,
     body: CreateOrgRequest,
     user_id: CurrentUserID,
-    session: DBSession,
+    service: OrgSvc,
 ) -> OrgResponse:
     """Create a new organisation. The caller becomes the owner automatically."""
-    service = OrgService(session)
     org = await service.create_org(user_id, name=body.name, slug=body.slug)
     return OrgResponse.model_validate(org)
 
@@ -46,10 +43,10 @@ async def create_org(
 async def list_my_orgs(
     request: Request,
     user_id: CurrentUserID,
-    session: DBSession,
+    service: OrgSvc,
 ) -> list[OrgResponse]:
     """List all orgs the authenticated user is an active member of."""
-    orgs = await OrgRepository(session).get_user_orgs(user_id)
+    orgs = await service.list_my_orgs(user_id)
     return [OrgResponse.model_validate(o) for o in orgs]
 
 
@@ -59,10 +56,9 @@ async def get_org(
     request: Request,
     org_id: uuid.UUID,
     user_id: CurrentUserID,
-    session: DBSession,
+    service: OrgSvc,
 ) -> OrgResponse:
     """Return org details. User must be an active member."""
-    service = OrgService(session)
     org = await service.get_org(org_id, user_id)
     return OrgResponse.model_validate(org)
 
@@ -74,10 +70,9 @@ async def update_org(
     org_id: uuid.UUID,
     body: UpdateOrgRequest,
     user_id: CurrentUserID,
-    session: DBSession,
+    service: OrgSvc,
 ) -> OrgResponse:
     """Update org display name. Requires admin or owner role."""
-    service = OrgService(session)
     org = await service.update_org(org_id, user_id, name=body.name)
     return OrgResponse.model_validate(org)
 
@@ -88,12 +83,10 @@ async def list_members(
     request: Request,
     org_id: uuid.UUID,
     user_id: CurrentUserID,
-    session: DBSession,
+    service: OrgSvc,
 ) -> list[MemberResponse]:
     """List active members of an org. User must be a member."""
-    service = OrgService(session)
-    await service.get_org(org_id, user_id)  # membership gate
-    members = await MembershipRepository(session).get_org_members(org_id)
+    members = await service.list_members(org_id, user_id)
     return [MemberResponse.model_validate(m) for m in members]
 
 
@@ -104,10 +97,9 @@ async def invite_member(
     org_id: uuid.UUID,
     body: InviteMemberRequest,
     user_id: CurrentUserID,
-    session: DBSession,
+    service: OrgSvc,
 ) -> MemberResponse:
     """Invite an existing user to the org by email. Requires admin or owner role."""
-    service = OrgService(session)
     membership = await service.invite_member(
         org_id, inviter_id=user_id, email=str(body.email), role=body.role
     )
@@ -120,10 +112,9 @@ async def accept_invite(
     request: Request,
     org_id: uuid.UUID,
     user_id: CurrentUserID,
-    session: DBSession,
+    service: OrgSvc,
 ) -> MemberResponse:
     """Accept a pending org invite for the authenticated user."""
-    service = OrgService(session)
     membership = await service.accept_invite(org_id, user_id)
     return MemberResponse.model_validate(membership)
 
@@ -136,10 +127,9 @@ async def update_member_role(
     target_user_id: uuid.UUID,
     body: UpdateMemberRoleRequest,
     user_id: CurrentUserID,
-    session: DBSession,
+    service: OrgSvc,
 ) -> MemberResponse:
     """Change a member's role. Only owners can perform this."""
-    service = OrgService(session)
     membership = await service.change_role(
         org_id,
         requester_id=user_id,
@@ -156,9 +146,8 @@ async def remove_member(
     org_id: uuid.UUID,
     target_user_id: uuid.UUID,
     user_id: CurrentUserID,
-    session: DBSession,
+    service: OrgSvc,
 ) -> MessageResponse:
     """Remove a member from the org. Requires admin or owner role."""
-    service = OrgService(session)
     await service.remove_member(org_id, requester_id=user_id, target_user_id=target_user_id)
     return MessageResponse(message="Member removed.")
