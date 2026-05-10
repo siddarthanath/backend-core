@@ -7,6 +7,7 @@ import uuid
 
 # Third Party
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 # Internal
 from src.models.user import UserProfile
@@ -56,8 +57,14 @@ class UserRepository(BaseRepository[UserProfile]):
             UserProfile: The existing or newly created profile.
 
         """
-        existing = await self.get_by_id(user_id)
-        if existing:
-            return existing
-        profile = UserProfile(id=user_id, email=email)
-        return await self.create(profile)
+        # INSERT ... ON CONFLICT DO NOTHING is atomic — eliminates the race condition where two
+        # concurrent first requests for the same user both see no row and both attempt to insert.
+        stmt = (
+            pg_insert(UserProfile)
+            .values(id=user_id, email=email)
+            .on_conflict_do_nothing(index_elements=["id"])
+        )
+        await self.session.execute(stmt)
+        result = await self.get_by_id(user_id)
+        assert result is not None
+        return result

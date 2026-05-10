@@ -22,5 +22,5 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
     """
     session = db_registry.get("default").get_session()
-    async with session:
+    async with session.begin():
         yield session

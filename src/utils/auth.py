@@ -2,6 +2,9 @@
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
+# Standard Library
+from functools import lru_cache
+
 # Third Party
 from supabase import Client, create_client
 
@@ -11,6 +14,7 @@ from src.configs.settings import auth_settings
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
 
+@lru_cache(maxsize=1)
 def get_supabase_admin_client() -> Client:
     """Return a Supabase client authenticated with the service role key.
 

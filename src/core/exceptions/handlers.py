@@ -26,7 +26,7 @@ async def _validation_exception_handler(request: Request, exc: RequestValidation
     envelope = ErrorEnvelope.from_exception(
         code="VALIDATION_ERROR",
         message="Request validation failed",
-        detail=str(exc.errors()),
+        detail=exc.errors(),
     )
     return JSONResponse(status_code=422, content=envelope.model_dump())
 
