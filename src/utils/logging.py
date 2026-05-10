@@ -27,7 +27,7 @@ def configure_logging(*, debug: bool = False) -> None:
     shared: list[Processor] = [
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_log_level,
-        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.TimeStamper(fmt="iso", utc=True),
         structlog.processors.CallsiteParameterAdder(
             [
                 structlog.processors.CallsiteParameter.FILENAME,
@@ -40,7 +40,7 @@ def configure_logging(*, debug: bool = False) -> None:
     processors: list[Processor] = (
         [*shared, structlog.dev.ConsoleRenderer()]
         if debug
-        else [*shared, structlog.processors.ExceptionRenderer(), structlog.processors.JSONRenderer()]
+        else [*shared, structlog.processors.format_exc_info, structlog.processors.JSONRenderer()]
     )
 
     structlog.configure(
