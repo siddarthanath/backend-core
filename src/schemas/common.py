@@ -1,26 +1,40 @@
-"""Database dependency — yields an AsyncSession from the registry session factory."""
+"""Common response schemas — reusable envelope types used across all domains."""
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
 # Standard Library
-from collections.abc import AsyncGenerator
+from typing import Generic, TypeVar
 
 # Third Party
-from sqlalchemy.ext.asyncio import AsyncSession
-
-# Internal
-from src.core.registry import db_registry
+from pydantic import BaseModel
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
+T = TypeVar("T")
 
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Yield an AsyncSession, closing it when the request completes.
 
-    Yields:
-        AsyncSession: A session bound to the registered database engine.
+class PaginationMeta(BaseModel):
+    """Pagination metadata included in every paginated response."""
+
+    total: int
+    limit: int
+    offset: int
+    has_more: bool
+
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    """Wraps a list of items with pagination metadata.
+
+    Usage: response_model=PaginatedResponse[MyItemResponse]
 
     """
-    session = db_registry.get("default").get_session()
-    async with session.begin():
-        yield session
+
+    data: list[T]
+    meta: PaginationMeta
+
+
+class MessageResponse(BaseModel):
+    """Generic success response for operations that have no meaningful return value."""
+
+    message: str
+    detail: str | None = None

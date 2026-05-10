@@ -1,19 +1,31 @@
-"""Auth settings — Supabase JWT verification (backend decodes only, never issues)."""
+"""Auth utilities — Supabase admin client factory."""
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
+# Standard Library
+from functools import lru_cache
+
 # Third Party
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from supabase import Client, create_client
+
+# Internal
+from src.configs.settings import auth_settings
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
 
-class AuthSettings(BaseSettings):
-    """Supabase project credentials for JWT verification."""
+@lru_cache(maxsize=1)
+def get_supabase_admin_client() -> Client:
+    """Return a Supabase client authenticated with the service role key.
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    Uses the service role key, not the anon key — only call from server-side code.
+    Never expose this client or its token to the frontend.
 
-    SUPABASE_URL: str
-    SUPABASE_JWT_SECRET: str
-    SUPABASE_ANON_KEY: str
-    SUPABASE_SERVICE_ROLE_KEY: str = ""
+    Returns:
+        Client: Supabase client with admin privileges.
+
+    """
+    return create_client(
+        auth_settings.SUPABASE_URL,
+        auth_settings.SUPABASE_SERVICE_ROLE_KEY,
+    )

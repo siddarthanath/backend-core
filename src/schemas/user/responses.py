@@ -1,26 +1,38 @@
-"""Database dependency — yields an AsyncSession from the registry session factory."""
+"""User response schemas — output shapes for user endpoints."""
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
 # Standard Library
-from collections.abc import AsyncGenerator
+import uuid
+from datetime import datetime
 
 # Third Party
-from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel, ConfigDict
 
 # Internal
-from src.core.registry import db_registry
+from src.constants import Plan
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
 
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Yield an AsyncSession, closing it when the request completes.
+class UserProfileResponse(BaseModel):
+    """Public user profile — returned by PATCH /user/me."""
 
-    Yields:
-        AsyncSession: A session bound to the registered database engine.
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    email: str
+    first_name: str | None
+    last_name: str | None
+    created_at: datetime
+
+
+class UserMeResponse(UserProfileResponse):
+    """Extended profile returned by GET /user/me — includes billing and org context.
+
+    plan and org_count default to FREE/0 until billing (Round 5) and orgs (Round 4) are wired in.
 
     """
-    session = db_registry.get("default").get_session()
-    async with session.begin():
-        yield session
+
+    plan: Plan = Plan.FREE
+    org_count: int = 0

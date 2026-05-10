@@ -6,7 +6,15 @@
 from src.core.exceptions.base import CoreException
 from src.core.exceptions.envelope import ErrorEnvelope
 from src.core.exceptions.handlers import add_exception_handlers
-from src.core.exceptions.types import AuthException, NotFoundError, RateLimitError, ValidationError
+from src.core.exceptions.types import (
+    AuthException,
+    ConflictError,
+    ExternalServiceError,
+    ForbiddenError,
+    NotFoundError,
+    RateLimitError,
+    ValidationError,
+)
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
@@ -15,6 +23,9 @@ __all__ = [
     "ErrorEnvelope",
     "add_exception_handlers",
     "AuthException",
+    "ConflictError",
+    "ExternalServiceError",
+    "ForbiddenError",
     "NotFoundError",
     "RateLimitError",
     "ValidationError",
