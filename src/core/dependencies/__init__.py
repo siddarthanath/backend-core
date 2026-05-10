@@ -4,7 +4,7 @@
 
 # Standard Library
 import uuid
-from typing import Annotated
+from typing import Annotated, TypeAlias
 
 # Third Party
 from fastapi import Depends
@@ -33,9 +33,9 @@ async def get_current_user_id(
     return uuid.UUID(claims.sub)
 
 
-CurrentUserID = Annotated[uuid.UUID, Depends(get_current_user_id)]
-CurrentUserClaims = Annotated[UserClaims, Depends(get_current_user)]
-DBSession = Annotated[AsyncSession, Depends(get_db)]
+CurrentUserID: TypeAlias = Annotated[uuid.UUID, Depends(get_current_user_id)]
+CurrentUserClaims: TypeAlias = Annotated[UserClaims, Depends(get_current_user)]
+DBSession: TypeAlias = Annotated[AsyncSession, Depends(get_db)]
 
 __all__ = [
     "get_db",
