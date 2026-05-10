@@ -11,11 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 # Internal
 from src.configs.settings import database_settings
-from src.utils.logging import setup_logger
+from src.utils.logging import get_logger
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
-logger = setup_logger(__name__)
+log = get_logger(__name__)
 
 
 class DatabaseSession:
@@ -54,7 +54,7 @@ class DatabaseSession:
             class_=AsyncSession,
             expire_on_commit=False,
         )
-        logger.info("Database engine initialised")
+        log.info("db.engine_initialised")
 
     async def close(self) -> None:
         """Dispose the engine and release all pool connections."""
@@ -62,7 +62,7 @@ class DatabaseSession:
             await self._engine.dispose()
             self._engine = None
             self._session_factory = None
-            logger.info("Database engine disposed")
+            log.info("db.engine_disposed")
 
     def get_session(self) -> AsyncSession:
         """Return a new AsyncSession from the session factory.

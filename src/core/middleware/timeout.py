@@ -13,11 +13,11 @@ from starlette.responses import JSONResponse, Response
 # Internal
 from src.configs.settings import app_settings
 from src.core.exceptions.envelope import ErrorEnvelope
-from src.utils.logging import setup_logger
+from src.utils.logging import get_logger
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
-logger = setup_logger(__name__)
+log = get_logger(__name__)
 
 
 class TimeoutMiddleware(BaseHTTPMiddleware):
@@ -35,6 +35,6 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
                 timeout=app_settings.REQUEST_TIMEOUT_SECONDS,
             )
         except asyncio.TimeoutError:
-            logger.warning("Request timed out: %s %s", request.method, request.url.path)
+            log.warning("request.timeout", method=request.method, path=request.url.path)
             envelope = ErrorEnvelope.from_exception(code="TIMEOUT", message="Request timed out")
             return JSONResponse(status_code=504, content=envelope.model_dump())

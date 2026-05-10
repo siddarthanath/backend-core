@@ -7,14 +7,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Dict, Generic, TypeVar
 
 # Internal
-from src.utils.logging import setup_logger
+from src.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from src.services.sessions.database import DatabaseSession
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
-logger = setup_logger(__name__)
+log = get_logger(__name__)
 
 T = TypeVar("T")
 
@@ -58,10 +58,10 @@ class Registry(Generic[T]):
             raise ValueError(f"Item {item.__class__.__name__} must have a non-empty name.")
 
         if name in self._items:
-            logger.warning(f"[{self.name}] '{name}' already registered. Overwriting.")
+            log.warning("registry.overwrite", registry=self.name, key=name)
 
         self._items[name] = item
-        logger.info(f"[{self.name}] Registered: {name}")
+        log.info("registry.registered", registry=self.name, key=name)
 
     def register_many(self, items: list[T]) -> None:
         """Register multiple items at once.
@@ -126,7 +126,7 @@ class Registry(Generic[T]):
     def clear(self) -> None:
         """Clear all registered items (mainly for testing)."""
         self._items.clear()
-        logger.info(f"[{self.name}] Cleared all items.")
+        log.info("registry.cleared", registry=self.name)
 
     def __len__(self) -> int:
         return len(self._items)
