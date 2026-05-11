@@ -1,7 +1,14 @@
 """Skip all integration tests unless INTEGRATION_TESTS=1 is set."""
 
+# ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
+
+# Standard Library
 import os
+
+# Third Party
 import pytest
+
+# ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
 
 def pytest_collection_modifyitems(items):
