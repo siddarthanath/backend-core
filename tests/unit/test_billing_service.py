@@ -161,6 +161,61 @@ async def test_create_checkout_calls_billing_svc_and_returns_url():
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_create_checkout_raises_when_price_id_not_configured():
+    orchestrator, subscription_repo, org_repo, membership_repo, _ = make_orchestrator()
+    org_repo.get_by_id.return_value = make_org()
+    membership_repo.user_has_role.return_value = True
+    subscription_repo.upsert_free.return_value = make_subscription(plan=Plan.FREE)
+
+    with patch("src.services.billing.service._build_price_map", return_value={}):
+        with pytest.raises(ValueError, match="No Stripe price ID configured"):
+            await orchestrator.create_checkout(
+                uuid.uuid4(), uuid.uuid4(), Plan.PRO, BillingPeriod.MONTHLY,
+                "https://success.example.com", "https://cancel.example.com",
+            )
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+@pytest.mark.parametrize("period", [BillingPeriod.MONTHLY, BillingPeriod.YEARLY])
+async def test_create_checkout_routes_correct_price_id_per_period(period: BillingPeriod):
+    orchestrator, subscription_repo, org_repo, membership_repo, billing_svc = make_orchestrator()
+    org = make_org()
+    org_repo.get_by_id.return_value = org
+    membership_repo.user_has_role.return_value = True
+    subscription_repo.upsert_free.return_value = make_subscription(plan=Plan.FREE)
+    billing_svc.create_checkout_session.return_value = ("https://checkout.stripe.com/xyz", "cus_123")
+
+    price_map = {
+        (Plan.PRO, BillingPeriod.MONTHLY): "price_pro_monthly",
+        (Plan.PRO, BillingPeriod.YEARLY): "price_pro_yearly",
+    }
+    with patch("src.services.billing.service._build_price_map", return_value=price_map):
+        await orchestrator.create_checkout(
+            org.id, uuid.uuid4(), Plan.PRO, period,
+            "https://success.example.com", "https://cancel.example.com",
+        )
+
+    _, call_kwargs = billing_svc.create_checkout_session.call_args
+    assert call_kwargs["price_id"] == price_map[(Plan.PRO, period)]
+
+
+@pytest.mark.unit
+def test_plan_from_price_raises_on_unknown_price_id():
+    _, _, _, _, billing_svc = make_orchestrator()
+    orchestrator = BillingOrchestrator(
+        subscription_repo=AsyncMock(),
+        org_repo=AsyncMock(),
+        membership_repo=AsyncMock(),
+        billing_svc=billing_svc,
+    )
+    with patch("src.services.billing.service._build_price_map", return_value={(Plan.PRO, BillingPeriod.MONTHLY): "price_known"}):
+        with pytest.raises(ValueError, match="Unknown Stripe price ID"):
+            orchestrator._plan_from_price("price_unknown")
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_create_portal_raises_forbidden_for_non_admin():
     orchestrator, _, org_repo, membership_repo, _ = make_orchestrator()
     org_repo.get_by_id.return_value = make_org()
