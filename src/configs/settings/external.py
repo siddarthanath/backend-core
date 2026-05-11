@@ -15,6 +15,9 @@ class ExternalSettings(BaseSettings):
 
     STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
-    STRIPE_PRO_PRICE_ID: str = ""
-    STRIPE_ENTERPRISE_PRICE_ID: str = ""
+    STRIPE_PRO_MONTHLY_PRICE_ID: str = ""
+    STRIPE_PRO_YEARLY_PRICE_ID: str = ""
+    STRIPE_MAX_MONTHLY_PRICE_ID: str = ""
+    STRIPE_MAX_YEARLY_PRICE_ID: str = ""
+    # Enterprise uses custom pricing — no Stripe price IDs needed (handled via sales/contact)
     RESEND_API_KEY: str = ""

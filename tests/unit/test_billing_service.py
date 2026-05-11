@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 # Internal
-from src.constants import Plan, Role, SubscriptionStatus
+from src.constants import BillingPeriod, Plan, Role, SubscriptionStatus
 from src.core.exceptions.types import ConflictError, ForbiddenError, NotFoundError
 from src.repositories.billing import SubscriptionRepository
 from src.repositories.org import MembershipRepository, OrgRepository
@@ -106,20 +106,21 @@ async def test_create_checkout_raises_forbidden_for_non_admin():
 
     with pytest.raises(ForbiddenError):
         await orchestrator.create_checkout(
-            uuid.uuid4(), uuid.uuid4(), Plan.PRO, "https://success.example.com", "https://cancel.example.com"
+            uuid.uuid4(), uuid.uuid4(), Plan.PRO, BillingPeriod.MONTHLY, "https://success.example.com", "https://cancel.example.com"
         )
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_create_checkout_raises_conflict_for_free_plan():
+@pytest.mark.parametrize("plan", [Plan.FREE, Plan.ENTERPRISE])
+async def test_create_checkout_raises_conflict_for_non_stripe_plan(plan: Plan):
     orchestrator, _, org_repo, membership_repo, _ = make_orchestrator()
     org_repo.get_by_id.return_value = make_org()
     membership_repo.user_has_role.return_value = True
 
     with pytest.raises(ConflictError):
         await orchestrator.create_checkout(
-            uuid.uuid4(), uuid.uuid4(), Plan.FREE, "https://success.example.com", "https://cancel.example.com"
+            uuid.uuid4(), uuid.uuid4(), plan, BillingPeriod.MONTHLY, "https://success.example.com", "https://cancel.example.com"
         )
 
 
@@ -135,7 +136,7 @@ async def test_create_checkout_raises_conflict_when_already_on_plan():
 
     with pytest.raises(ConflictError):
         await orchestrator.create_checkout(
-            uuid.uuid4(), uuid.uuid4(), Plan.PRO, "https://success.example.com", "https://cancel.example.com"
+            uuid.uuid4(), uuid.uuid4(), Plan.PRO, BillingPeriod.MONTHLY, "https://success.example.com", "https://cancel.example.com"
         )
 
 
@@ -149,9 +150,9 @@ async def test_create_checkout_calls_billing_svc_and_returns_url():
     subscription_repo.upsert_free.return_value = make_subscription(plan=Plan.FREE)
     billing_svc.create_checkout_session.return_value = ("https://checkout.stripe.com/xyz", "cus_123")
 
-    with patch("src.services.billing.service._build_price_map", return_value={Plan.PRO: "price_pro_123"}):
+    with patch("src.services.billing.service._build_price_map", return_value={(Plan.PRO, BillingPeriod.MONTHLY): "price_pro_monthly_123"}):
         result = await orchestrator.create_checkout(
-            org.id, uuid.uuid4(), Plan.PRO, "https://success.example.com", "https://cancel.example.com"
+            org.id, uuid.uuid4(), Plan.PRO, BillingPeriod.MONTHLY, "https://success.example.com", "https://cancel.example.com"
         )
 
     billing_svc.create_checkout_session.assert_awaited_once()

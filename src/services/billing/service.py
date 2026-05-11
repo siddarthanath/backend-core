@@ -12,7 +12,7 @@ import stripe
 
 # Internal
 from src.configs.settings import external_settings
-from src.constants import Plan, Role, SubscriptionStatus
+from src.constants import BillingPeriod, Plan, Role, SubscriptionStatus
 from src.core.exceptions.types import ConflictError, ForbiddenError, NotFoundError
 from src.models.billing import Subscription
 from src.repositories.billing import SubscriptionRepository
@@ -26,10 +26,12 @@ from src.utils.logging import get_logger
 log = get_logger(__name__)
 
 
-def _build_price_map() -> dict[Plan, str]:
+def _build_price_map() -> dict[tuple[Plan, BillingPeriod], str]:
     return {
-        Plan.PRO: external_settings.STRIPE_PRO_PRICE_ID,
-        Plan.ENTERPRISE: external_settings.STRIPE_ENTERPRISE_PRICE_ID,
+        (Plan.PRO, BillingPeriod.MONTHLY): external_settings.STRIPE_PRO_MONTHLY_PRICE_ID,
+        (Plan.PRO, BillingPeriod.YEARLY): external_settings.STRIPE_PRO_YEARLY_PRICE_ID,
+        (Plan.MAX, BillingPeriod.MONTHLY): external_settings.STRIPE_MAX_MONTHLY_PRICE_ID,
+        (Plan.MAX, BillingPeriod.YEARLY): external_settings.STRIPE_MAX_YEARLY_PRICE_ID,
     }
 
 
@@ -159,6 +161,7 @@ class BillingOrchestrator:
         org_id: uuid.UUID,
         user_id: uuid.UUID,
         plan: Plan,
+        period: BillingPeriod,
         success_url: str,
         cancel_url: str,
     ) -> CheckoutResponse:
@@ -185,17 +188,17 @@ class BillingOrchestrator:
             raise NotFoundError("Organisation", org_id)
         if not await self.membership_repo.user_has_role(user_id, org_id, Role.ADMIN):
             raise ForbiddenError("Only admins can manage billing")
-        if plan == Plan.FREE:
-            raise ConflictError("Plan", "plan", "free")
+        if plan in (Plan.FREE, Plan.ENTERPRISE):
+            raise ConflictError("Plan", "plan", plan.value)
 
         sub = await self.subscription_repo.upsert_free(org_id)
         if sub.plan == plan and sub.status == SubscriptionStatus.ACTIVE:
             raise ConflictError("Subscription", "plan", plan.value)
 
         price_map = _build_price_map()
-        price_id = price_map.get(plan)
+        price_id = price_map.get((plan, period))
         if not price_id:
-            raise ValueError(f"No Stripe price ID configured for plan: {plan.value}")
+            raise ValueError(f"No Stripe price ID configured for plan={plan.value} period={period.value}")
 
         checkout_url, stripe_customer_id = await self.billing_svc.create_checkout_session(
             customer_id=org.stripe_customer_id,
@@ -204,6 +207,7 @@ class BillingOrchestrator:
             success_url=success_url,
             cancel_url=cancel_url,
         )
+
 
         if not org.stripe_customer_id and stripe_customer_id:
             await self.org_repo.update(org, stripe_customer_id=stripe_customer_id)
@@ -360,7 +364,7 @@ class BillingOrchestrator:
 
     def _plan_from_price(self, price_id: str) -> Plan:
         price_map = _build_price_map()
-        for plan, pid in price_map.items():
+        for (plan, _), pid in price_map.items():
             if pid == price_id:
                 return plan
         raise ValueError(f"Unknown Stripe price ID: {price_id}")

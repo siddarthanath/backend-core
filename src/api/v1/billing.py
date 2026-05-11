@@ -46,6 +46,7 @@ async def create_checkout(
         org_id,
         user_id,
         plan=body.plan,
+        period=body.period,
         success_url=str(body.success_url),
         cancel_url=str(body.cancel_url),
     )
