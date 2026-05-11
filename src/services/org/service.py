@@ -11,6 +11,7 @@ from src.core.exceptions.types import ConflictError, ForbiddenError, NotFoundErr
 from src.models.org import Membership, Organisation
 from src.repositories.org import MembershipRepository, OrgRepository
 from src.repositories.user import UserRepository
+from src.schemas.org.responses import MemberResponse
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
@@ -40,8 +41,8 @@ class OrgService:
         """
         return await self.org_repo.get_user_orgs(user_id)
 
-    async def list_members(self, org_id: uuid.UUID, user_id: uuid.UUID) -> list[Membership]:
-        """Return active members of an org. User must be a member.
+    async def list_members(self, org_id: uuid.UUID, user_id: uuid.UUID) -> list[MemberResponse]:
+        """Return active members of an org with email. User must be a member.
 
         Args:
             org_id (uuid.UUID): The org's UUID.
@@ -52,11 +53,15 @@ class OrgService:
             ForbiddenError: If the user is not a member.
 
         Returns:
-            list[Membership]: Active memberships for this org.
+            list[MemberResponse]: Active memberships with email for this org.
 
         """
         await self.get_org(org_id, user_id)
-        return await self.membership_repo.get_org_members(org_id)
+        rows = await self.membership_repo.get_org_members(org_id)
+        return [
+            MemberResponse.model_validate(membership, update={"email": email})
+            for membership, email in rows
+        ]
 
     async def create_org(
         self,

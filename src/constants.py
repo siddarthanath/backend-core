@@ -23,7 +23,13 @@ class MembershipStatus(StrEnum):
 class Plan(StrEnum):
     FREE = "free"
     PRO = "pro"
+    MAX = "max"
     ENTERPRISE = "enterprise"
+
+
+class BillingPeriod(StrEnum):
+    MONTHLY = "monthly"
+    YEARLY = "yearly"
 
 
 class SubscriptionStatus(StrEnum):

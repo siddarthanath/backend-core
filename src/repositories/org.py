@@ -11,6 +11,7 @@ from sqlalchemy import and_, func, select
 # Internal
 from src.constants import MembershipStatus, Role
 from src.models.org import Membership, Organisation
+from src.models.user import UserProfile
 from src.repositories.base import BaseRepository
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
@@ -89,24 +90,25 @@ class MembershipRepository(BaseRepository[Membership]):
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_org_members(self, org_id: uuid.UUID) -> list[Membership]:
-        """Return all active memberships for an org.
+    async def get_org_members(self, org_id: uuid.UUID) -> list[tuple[Membership, str]]:
+        """Return active memberships with member email for an org.
 
         Args:
             org_id (uuid.UUID): The org's UUID.
 
         Returns:
-            list[Membership]: Active memberships ordered by creation date.
+            list[tuple[Membership, str]]: Active memberships with email, ordered by creation date.
 
         """
         stmt = (
-            select(Membership)
+            select(Membership, UserProfile.email)
+            .join(UserProfile, UserProfile.id == Membership.user_id)
             .where(Membership.org_id == org_id)
             .where(Membership.status == MembershipStatus.ACTIVE)
             .order_by(Membership.created_at.asc())
         )
         result = await self.session.execute(stmt)
-        return list(result.scalars().all())
+        return [(row.Membership, row.email) for row in result.all()]
 
     async def count_owners(self, org_id: uuid.UUID) -> int:
         """Count active OWNER memberships in the org.

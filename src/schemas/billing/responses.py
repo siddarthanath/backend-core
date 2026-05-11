@@ -1,4 +1,4 @@
-"""Org response schemas — output shapes for org and membership endpoints."""
+"""Billing response schemas — output shapes for billing endpoints."""
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
@@ -11,33 +11,33 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict
 
 # Internal
-from src.constants import MembershipStatus, Role
+from src.constants import Plan, SubscriptionStatus
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
 
-class OrgResponse(BaseModel):
-    """Org summary — returned by create, list, and update endpoints."""
+class SubscriptionResponse(BaseModel):
+    """Current subscription state for an org."""
 
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    name: str
-    slug: str
-    is_personal: bool
-    created_at: datetime
-
-
-class MemberResponse(BaseModel):
-    """Membership record — returned by invite, role-change, and member-list endpoints."""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    user_id: uuid.UUID
     org_id: uuid.UUID
-    role: Role
-    status: MembershipStatus
-    invited_by: Optional[uuid.UUID]
-    email: Optional[str] = None
+    plan: Plan
+    status: SubscriptionStatus
+    stripe_subscription_id: Optional[str]
+    current_period_end: Optional[datetime]
+    cancel_at_period_end: bool
     created_at: datetime
+
+
+class CheckoutResponse(BaseModel):
+    """URL to redirect the user to for Stripe checkout."""
+
+    checkout_url: str
+
+
+class PortalResponse(BaseModel):
+    """URL to redirect the user to for Stripe customer portal."""
+
+    portal_url: str
