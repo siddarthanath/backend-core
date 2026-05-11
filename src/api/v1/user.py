@@ -42,6 +42,9 @@ async def get_me(
     """
     user_id = uuid.UUID(claims.sub)
     user = await service.get_or_create(user_id, email=claims.email)
+    # No personal org is auto-created here. Users must create an org manually via the
+    # OrgSwitcher. For solo/consumer products, call OrgService.create()
+    # here with is_personal=True to give every new user a default workspace immediately.
     return UserMeResponse(
         id=user.id,
         email=user.email,
