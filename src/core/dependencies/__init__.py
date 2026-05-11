@@ -4,7 +4,7 @@
 
 # Standard Library
 import uuid
-from typing import Annotated
+from typing import Annotated, TypeAlias
 
 # Third Party
 from fastapi import Depends
@@ -13,7 +13,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Internal
 from src.core.dependencies.auth import get_current_user
 from src.core.dependencies.database import get_db
+from src.repositories.org import MembershipRepository, OrgRepository
+from src.repositories.user import UserRepository
 from src.schemas.auth import UserClaims
+from src.services.org.service import OrgService
+from src.services.user.service import UserService
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
@@ -33,15 +37,55 @@ async def get_current_user_id(
     return uuid.UUID(claims.sub)
 
 
-CurrentUserID = Annotated[uuid.UUID, Depends(get_current_user_id)]
-CurrentUserClaims = Annotated[UserClaims, Depends(get_current_user)]
-DBSession = Annotated[AsyncSession, Depends(get_db)]
+# Base aliases — defined first so factory functions can reference them as type hints.
+CurrentUserID: TypeAlias = Annotated[uuid.UUID, Depends(get_current_user_id)]
+CurrentUserClaims: TypeAlias = Annotated[UserClaims, Depends(get_current_user)]
+DBSession: TypeAlias = Annotated[AsyncSession, Depends(get_db)]
+
+
+def get_user_service(session: DBSession) -> UserService:
+    """Construct UserService with its repository for the current request session.
+
+    Args:
+        session (AsyncSession): The request-scoped DB session from get_db.
+
+    Returns:
+        UserService: Ready-to-use service instance.
+
+    """
+    return UserService(repo=UserRepository(session))
+
+
+def get_org_service(session: DBSession) -> OrgService:
+    """Construct OrgService with its repositories for the current request session.
+
+    Args:
+        session (AsyncSession): The request-scoped DB session from get_db.
+
+    Returns:
+        OrgService: Ready-to-use service instance.
+
+    """
+    return OrgService(
+        org_repo=OrgRepository(session),
+        membership_repo=MembershipRepository(session),
+        user_repo=UserRepository(session),
+    )
+
+
+# Service aliases — defined after their factory functions.
+UserSvc: TypeAlias = Annotated[UserService, Depends(get_user_service)]
+OrgSvc: TypeAlias = Annotated[OrgService, Depends(get_org_service)]
 
 __all__ = [
     "get_db",
     "get_current_user",
     "get_current_user_id",
+    "get_user_service",
+    "get_org_service",
     "CurrentUserID",
     "CurrentUserClaims",
     "DBSession",
+    "UserSvc",
+    "OrgSvc",
 ]

@@ -5,9 +5,6 @@
 # Standard Library
 import uuid
 
-# Third Party
-from sqlalchemy.ext.asyncio import AsyncSession
-
 # Internal
 from src.core.exceptions.types import NotFoundError
 from src.models.user import UserProfile
@@ -19,8 +16,8 @@ from src.repositories.user import UserRepository
 class UserService:
     """Orchestrates UserProfile operations. Raises typed exceptions, never HTTPException."""
 
-    def __init__(self, session: AsyncSession) -> None:
-        self.repo = UserRepository(session)
+    def __init__(self, repo: UserRepository) -> None:
+        self.repo = repo
 
     async def get_or_create(self, user_id: uuid.UUID, email: str) -> UserProfile:
         """Return existing profile or create one from Supabase auth data.
