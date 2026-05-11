@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime, timezone
 
 # Third Party
+import anyio.to_thread
 import stripe
 
 # Internal
@@ -23,8 +24,6 @@ from src.utils.logging import get_logger
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
 log = get_logger(__name__)
-
-_PRICE_ID_MAP: dict[Plan, str] = {}
 
 
 def _build_price_map() -> dict[Plan, str]:
@@ -74,7 +73,7 @@ class StripeBillingService(BaseBillingService):
         else:
             params["customer_creation"] = "always"
 
-        session = stripe.checkout.Session.create(**params)
+        session = await anyio.to_thread.run_sync(lambda: stripe.checkout.Session.create(**params))
         return session.url, session.customer  # type: ignore[return-value]
 
     async def create_portal_session(self, customer_id: str, return_url: str) -> str:
@@ -194,7 +193,9 @@ class BillingOrchestrator:
             raise ConflictError("Subscription", "plan", plan.value)
 
         price_map = _build_price_map()
-        price_id = price_map.get(plan, "")
+        price_id = price_map.get(plan)
+        if not price_id:
+            raise ValueError(f"No Stripe price ID configured for plan: {plan.value}")
 
         checkout_url, stripe_customer_id = await self.billing_svc.create_checkout_session(
             customer_id=org.stripe_customer_id,
@@ -290,7 +291,7 @@ class BillingOrchestrator:
         if not sub:
             return
 
-        stripe_sub = stripe.Subscription.retrieve(stripe_sub_id)
+        stripe_sub = await anyio.to_thread.run_sync(lambda: stripe.Subscription.retrieve(stripe_sub_id))
         price_id: str = stripe_sub["items"]["data"][0]["price"]["id"]
         plan = self._plan_from_price(price_id)
         period_end = datetime.fromtimestamp(
@@ -317,7 +318,10 @@ class BillingOrchestrator:
         price_id: str = data["items"]["data"][0]["price"]["id"]
         plan = self._plan_from_price(price_id)
         status_str: str = data.get("status", "active")
-        status = SubscriptionStatus(status_str) if status_str in SubscriptionStatus.__members__.values() else SubscriptionStatus.ACTIVE
+        try:
+            status = SubscriptionStatus(status_str)
+        except ValueError:
+            status = SubscriptionStatus.ACTIVE
         period_end = datetime.fromtimestamp(data["current_period_end"], tz=timezone.utc)
 
         await self.subscription_repo.update(
@@ -359,4 +363,4 @@ class BillingOrchestrator:
         for plan, pid in price_map.items():
             if pid == price_id:
                 return plan
-        return Plan.PRO
+        raise ValueError(f"Unknown Stripe price ID: {price_id}")

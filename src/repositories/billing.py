@@ -6,6 +6,7 @@
 import uuid
 
 # Third Party
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 
 # Internal
@@ -68,6 +69,9 @@ class SubscriptionRepository(BaseRepository[Subscription]):
         existing = await self.get_by_org(org_id)
         if existing:
             return existing
-        return await self.create(
-            Subscription(org_id=org_id, plan=Plan.FREE, status=SubscriptionStatus.ACTIVE)
-        )
+        try:
+            return await self.create(
+                Subscription(org_id=org_id, plan=Plan.FREE, status=SubscriptionStatus.ACTIVE)
+            )
+        except IntegrityError:
+            return await self.get_by_org(org_id)  # type: ignore[return-value]
