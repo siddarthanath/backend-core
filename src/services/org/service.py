@@ -177,6 +177,8 @@ class OrgService:
         """
         if not await self.membership_repo.user_has_role(inviter_id, org_id, Role.ADMIN):
             raise ForbiddenError("Only admins can invite members")
+        if role == Role.OWNER and not await self.membership_repo.user_has_role(inviter_id, org_id, Role.OWNER):
+            raise ForbiddenError("Only owners can assign the owner role")
 
         invitee = await self.user_repo.get_by_email(email)
         if not invitee:
@@ -271,5 +273,11 @@ class OrgService:
         membership = await self.membership_repo.get_membership(target_user_id, org_id)
         if not membership:
             raise NotFoundError("Membership", target_user_id)
+
+        if membership.role == Role.OWNER:
+            if not await self.membership_repo.user_has_role(requester_id, org_id, Role.OWNER):
+                raise ForbiddenError("Only owners can remove other owners")
+            if await self.membership_repo.count_owners(org_id) <= 1:
+                raise ForbiddenError("Cannot remove the last owner of an organisation")
 
         await self.membership_repo.hard_delete(membership)

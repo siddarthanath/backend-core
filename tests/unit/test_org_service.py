@@ -145,6 +145,17 @@ async def test_invite_member_raises_conflict_if_already_member():
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_invite_member_raises_forbidden_when_admin_assigns_owner_role():
+    service, _, membership_repo, _ = make_service()
+    # user_has_role returns True for ADMIN check, False for OWNER check
+    membership_repo.user_has_role.side_effect = [True, False]
+
+    with pytest.raises(ForbiddenError, match="owner"):
+        await service.invite_member(uuid.uuid4(), inviter_id=uuid.uuid4(), email="x@example.com", role=Role.OWNER)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_accept_invite_raises_not_found_when_no_pending_invite():
     service, _, membership_repo, _ = make_service()
     membership_repo.get_membership.return_value = None
@@ -202,4 +213,28 @@ async def test_remove_member_raises_not_found_for_non_member_target():
     membership_repo.get_membership.return_value = None
 
     with pytest.raises(NotFoundError):
+        await service.remove_member(uuid.uuid4(), requester_id=uuid.uuid4(), target_user_id=uuid.uuid4())
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_remove_member_raises_forbidden_when_admin_removes_owner():
+    service, _, membership_repo, _ = make_service()
+    # ADMIN check passes, OWNER check fails
+    membership_repo.user_has_role.side_effect = [True, False]
+    membership_repo.get_membership.return_value = make_membership(role=Role.OWNER)
+
+    with pytest.raises(ForbiddenError, match="owner"):
+        await service.remove_member(uuid.uuid4(), requester_id=uuid.uuid4(), target_user_id=uuid.uuid4())
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_remove_member_raises_forbidden_when_removing_last_owner():
+    service, _, membership_repo, _ = make_service()
+    membership_repo.user_has_role.return_value = True  # requester is owner
+    membership_repo.get_membership.return_value = make_membership(role=Role.OWNER)
+    membership_repo.count_owners.return_value = 1
+
+    with pytest.raises(ForbiddenError, match="last owner"):
         await service.remove_member(uuid.uuid4(), requester_id=uuid.uuid4(), target_user_id=uuid.uuid4())

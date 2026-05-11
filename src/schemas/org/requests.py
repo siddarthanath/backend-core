@@ -2,6 +2,9 @@
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
+# Standard Library
+import re
+
 # Third Party
 from pydantic import BaseModel, EmailStr, field_validator
 
@@ -21,7 +24,6 @@ class CreateOrgRequest(BaseModel):
     @classmethod
     def slug_format(cls, v: str) -> str:
         """Enforce lowercase alphanumeric + hyphens only."""
-        import re
         if not re.fullmatch(r"[a-z0-9-]+", v):
             raise ValueError("slug must be lowercase alphanumeric and hyphens only")
         return v

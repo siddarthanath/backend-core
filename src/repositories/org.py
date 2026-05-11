@@ -6,7 +6,7 @@
 import uuid
 
 # Third Party
-from sqlalchemy import and_, select
+from sqlalchemy import and_, func, select
 
 # Internal
 from src.constants import MembershipStatus, Role
@@ -107,6 +107,26 @@ class MembershipRepository(BaseRepository[Membership]):
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
+
+    async def count_owners(self, org_id: uuid.UUID) -> int:
+        """Count active OWNER memberships in the org.
+
+        Args:
+            org_id (uuid.UUID): The org's UUID.
+
+        Returns:
+            int: Number of active owners.
+
+        """
+        stmt = (
+            select(func.count())
+            .select_from(Membership)
+            .where(Membership.org_id == org_id)
+            .where(Membership.role == Role.OWNER)
+            .where(Membership.status == MembershipStatus.ACTIVE)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one()
 
     async def user_has_role(
         self,
