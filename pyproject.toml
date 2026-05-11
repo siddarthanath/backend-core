@@ -24,6 +24,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "supabase>=2.0.0",
     "email-validator>=2.0.0",
+    "stripe>=11.0.0",
 ]
 
 [project.optional-dependencies]
@@ -64,5 +65,8 @@ env = [
     "DATABASE_POOL_TIMEOUT=10",
     "DATABASE_POOL_RECYCLE=3600",
     "STRIPE_SECRET_KEY=",
+    "STRIPE_WEBHOOK_SECRET=",
+    "STRIPE_PRO_PRICE_ID=",
+    "STRIPE_ENTERPRISE_PRICE_ID=",
     "RESEND_API_KEY=",
 ]

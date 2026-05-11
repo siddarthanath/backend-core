@@ -1,0 +1,362 @@
+"""BillingOrchestrator and StripeBillingService — billing lifecycle coordination."""
+
+# ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
+
+# Standard Library
+import uuid
+from datetime import datetime, timezone
+
+# Third Party
+import stripe
+
+# Internal
+from src.configs.settings import external_settings
+from src.constants import Plan, Role, SubscriptionStatus
+from src.core.exceptions.types import ConflictError, ForbiddenError, NotFoundError
+from src.models.billing import Subscription
+from src.repositories.billing import SubscriptionRepository
+from src.repositories.org import MembershipRepository, OrgRepository
+from src.schemas.billing.responses import CheckoutResponse, PortalResponse, SubscriptionResponse
+from src.services.billing.interface import BaseBillingService
+from src.utils.logging import get_logger
+
+# ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
+
+log = get_logger(__name__)
+
+_PRICE_ID_MAP: dict[Plan, str] = {}
+
+
+def _build_price_map() -> dict[Plan, str]:
+    return {
+        Plan.PRO: external_settings.STRIPE_PRO_PRICE_ID,
+        Plan.ENTERPRISE: external_settings.STRIPE_ENTERPRISE_PRICE_ID,
+    }
+
+
+class StripeBillingService(BaseBillingService):
+    """Stripe implementation of BaseBillingService. All Stripe API calls live here."""
+
+    def __init__(self) -> None:
+        stripe.api_key = external_settings.STRIPE_SECRET_KEY
+        self._webhook_secret = external_settings.STRIPE_WEBHOOK_SECRET
+
+    async def create_checkout_session(
+        self,
+        customer_id: str | None,
+        price_id: str,
+        org_id: str,
+        success_url: str,
+        cancel_url: str,
+    ) -> tuple[str, str]:
+        """Create a Stripe checkout session.
+
+        Args:
+            customer_id (str | None): Existing Stripe customer ID, or None.
+            price_id (str): Stripe price ID for the target plan.
+            org_id (str): Org UUID stored in Stripe metadata.
+            success_url (str): Redirect URL on successful payment.
+            cancel_url (str): Redirect URL on cancelled checkout.
+
+        Returns:
+            tuple[str, str]: (checkout_url, stripe_customer_id).
+
+        """
+        params: dict = {
+            "mode": "subscription",
+            "line_items": [{"price": price_id, "quantity": 1}],
+            "success_url": success_url,
+            "cancel_url": cancel_url,
+            "metadata": {"org_id": org_id},
+        }
+        if customer_id:
+            params["customer"] = customer_id
+        else:
+            params["customer_creation"] = "always"
+
+        session = stripe.checkout.Session.create(**params)
+        return session.url, session.customer  # type: ignore[return-value]
+
+    async def create_portal_session(self, customer_id: str, return_url: str) -> str:
+        """Create a Stripe customer portal session URL.
+
+        Args:
+            customer_id (str): Stripe customer ID for the org.
+            return_url (str): Return URL after the portal session.
+
+        Returns:
+            str: Stripe portal session URL.
+
+        """
+        session = stripe.billing_portal.Session.create(
+            customer=customer_id,
+            return_url=return_url,
+        )
+        return session.url  # type: ignore[return-value]
+
+    async def parse_webhook(self, payload: bytes, sig_header: str) -> dict:
+        """Verify Stripe signature and return the parsed event dict.
+
+        Args:
+            payload (bytes): Raw request body.
+            sig_header (str): Stripe-Signature header value.
+
+        Raises:
+            ValueError: If the signature is invalid.
+
+        Returns:
+            dict: Parsed Stripe event.
+
+        """
+        try:
+            event = stripe.Webhook.construct_event(payload, sig_header, self._webhook_secret)
+        except stripe.SignatureVerificationError as exc:
+            raise ValueError("Invalid Stripe webhook signature") from exc
+        return dict(event)
+
+
+class BillingOrchestrator:
+    """Coordinates billing business logic: DB state + provider calls."""
+
+    def __init__(
+        self,
+        subscription_repo: SubscriptionRepository,
+        org_repo: OrgRepository,
+        membership_repo: MembershipRepository,
+        billing_svc: BaseBillingService,
+    ) -> None:
+        self.subscription_repo = subscription_repo
+        self.org_repo = org_repo
+        self.membership_repo = membership_repo
+        self.billing_svc = billing_svc
+
+    async def get_subscription(
+        self, org_id: uuid.UUID, user_id: uuid.UUID
+    ) -> SubscriptionResponse:
+        """Return the current subscription for an org.
+
+        Args:
+            org_id (uuid.UUID): The org's UUID.
+            user_id (uuid.UUID): The requesting user's UUID (must be a member).
+
+        Raises:
+            NotFoundError: If the org does not exist or user is not a member.
+
+        Returns:
+            SubscriptionResponse: Current subscription state.
+
+        """
+        org = await self.org_repo.get_by_id(org_id)
+        if not org:
+            raise NotFoundError("Organisation", org_id)
+        if not await self.membership_repo.user_has_role(user_id, org_id, Role.MEMBER):
+            raise ForbiddenError("You are not a member of this organisation")
+
+        sub = await self.subscription_repo.upsert_free(org_id)
+        return SubscriptionResponse.model_validate(sub)
+
+    async def create_checkout(
+        self,
+        org_id: uuid.UUID,
+        user_id: uuid.UUID,
+        plan: Plan,
+        success_url: str,
+        cancel_url: str,
+    ) -> CheckoutResponse:
+        """Initiate a Stripe checkout session for an org plan upgrade.
+
+        Args:
+            org_id (uuid.UUID): The org's UUID.
+            user_id (uuid.UUID): The requesting user's UUID (must be admin/owner).
+            plan (Plan): The target plan (PRO or ENTERPRISE).
+            success_url (str): Redirect URL on successful payment.
+            cancel_url (str): Redirect URL on cancelled checkout.
+
+        Raises:
+            ForbiddenError: If the user is not an admin or owner.
+            ConflictError: If the org is already on the requested plan.
+            NotFoundError: If the org does not exist.
+
+        Returns:
+            CheckoutResponse: Stripe checkout session URL.
+
+        """
+        org = await self.org_repo.get_by_id(org_id)
+        if not org:
+            raise NotFoundError("Organisation", org_id)
+        if not await self.membership_repo.user_has_role(user_id, org_id, Role.ADMIN):
+            raise ForbiddenError("Only admins can manage billing")
+        if plan == Plan.FREE:
+            raise ConflictError("Plan", "plan", "free")
+
+        sub = await self.subscription_repo.upsert_free(org_id)
+        if sub.plan == plan and sub.status == SubscriptionStatus.ACTIVE:
+            raise ConflictError("Subscription", "plan", plan.value)
+
+        price_map = _build_price_map()
+        price_id = price_map.get(plan, "")
+
+        checkout_url, stripe_customer_id = await self.billing_svc.create_checkout_session(
+            customer_id=org.stripe_customer_id,
+            price_id=price_id,
+            org_id=str(org_id),
+            success_url=success_url,
+            cancel_url=cancel_url,
+        )
+
+        if not org.stripe_customer_id and stripe_customer_id:
+            await self.org_repo.update(org, stripe_customer_id=stripe_customer_id)
+
+        log.info("billing.checkout_created", org_id=str(org_id), plan=plan.value)
+        return CheckoutResponse(checkout_url=checkout_url)
+
+    async def create_portal(
+        self,
+        org_id: uuid.UUID,
+        user_id: uuid.UUID,
+        return_url: str,
+    ) -> PortalResponse:
+        """Open the Stripe customer portal for an org.
+
+        Args:
+            org_id (uuid.UUID): The org's UUID.
+            user_id (uuid.UUID): The requesting user's UUID (must be admin/owner).
+            return_url (str): Return URL after the portal session.
+
+        Raises:
+            ForbiddenError: If the user is not an admin or owner, or org has no Stripe customer.
+            NotFoundError: If the org does not exist.
+
+        Returns:
+            PortalResponse: Stripe portal session URL.
+
+        """
+        org = await self.org_repo.get_by_id(org_id)
+        if not org:
+            raise NotFoundError("Organisation", org_id)
+        if not await self.membership_repo.user_has_role(user_id, org_id, Role.ADMIN):
+            raise ForbiddenError("Only admins can manage billing")
+        if not org.stripe_customer_id:
+            raise ForbiddenError("No billing account found — complete a checkout first")
+
+        portal_url = await self.billing_svc.create_portal_session(
+            customer_id=org.stripe_customer_id,
+            return_url=return_url,
+        )
+        return PortalResponse(portal_url=portal_url)
+
+    async def handle_webhook(self, payload: bytes, sig_header: str) -> None:
+        """Process a Stripe webhook event and update subscription state.
+
+        Handles: checkout.session.completed, customer.subscription.updated,
+        customer.subscription.deleted, invoice.payment_failed.
+
+        Args:
+            payload (bytes): Raw Stripe webhook body.
+            sig_header (str): Stripe-Signature header value.
+
+        Raises:
+            ValueError: If the webhook signature is invalid.
+
+        """
+        event = await self.billing_svc.parse_webhook(payload, sig_header)
+        event_type: str = event.get("type", "")
+        data = event.get("data", {}).get("object", {})
+
+        log.info("billing.webhook_received", event_type=event_type)
+
+        if event_type == "checkout.session.completed":
+            await self._on_checkout_completed(data)
+        elif event_type == "customer.subscription.updated":
+            await self._on_subscription_updated(data)
+        elif event_type == "customer.subscription.deleted":
+            await self._on_subscription_deleted(data)
+        elif event_type == "invoice.payment_failed":
+            await self._on_payment_failed(data)
+
+    async def _on_checkout_completed(self, data: dict) -> None:
+        org_id_str: str = data.get("metadata", {}).get("org_id", "")
+        stripe_sub_id: str = data.get("subscription", "")
+        if not org_id_str or not stripe_sub_id:
+            return
+
+        try:
+            org_id = uuid.UUID(org_id_str)
+        except ValueError:
+            log.warning("billing.webhook_invalid_org_id", org_id=org_id_str)
+            return
+
+        sub = await self.subscription_repo.get_by_org(org_id)
+        if not sub:
+            return
+
+        stripe_sub = stripe.Subscription.retrieve(stripe_sub_id)
+        price_id: str = stripe_sub["items"]["data"][0]["price"]["id"]
+        plan = self._plan_from_price(price_id)
+        period_end = datetime.fromtimestamp(
+            stripe_sub["current_period_end"], tz=timezone.utc
+        )
+
+        await self.subscription_repo.update(
+            sub,
+            plan=plan,
+            status=SubscriptionStatus.ACTIVE,
+            stripe_subscription_id=stripe_sub_id,
+            stripe_price_id=price_id,
+            current_period_end=period_end,
+            cancel_at_period_end=False,
+        )
+        log.info("billing.subscription_activated", org_id=org_id_str, plan=plan.value)
+
+    async def _on_subscription_updated(self, data: dict) -> None:
+        stripe_sub_id: str = data.get("id", "")
+        sub = await self.subscription_repo.get_by_stripe_subscription_id(stripe_sub_id)
+        if not sub:
+            return
+
+        price_id: str = data["items"]["data"][0]["price"]["id"]
+        plan = self._plan_from_price(price_id)
+        status_str: str = data.get("status", "active")
+        status = SubscriptionStatus(status_str) if status_str in SubscriptionStatus.__members__.values() else SubscriptionStatus.ACTIVE
+        period_end = datetime.fromtimestamp(data["current_period_end"], tz=timezone.utc)
+
+        await self.subscription_repo.update(
+            sub,
+            plan=plan,
+            status=status,
+            stripe_price_id=price_id,
+            current_period_end=period_end,
+            cancel_at_period_end=bool(data.get("cancel_at_period_end", False)),
+        )
+
+    async def _on_subscription_deleted(self, data: dict) -> None:
+        stripe_sub_id: str = data.get("id", "")
+        sub = await self.subscription_repo.get_by_stripe_subscription_id(stripe_sub_id)
+        if not sub:
+            return
+
+        await self.subscription_repo.update(
+            sub,
+            plan=Plan.FREE,
+            status=SubscriptionStatus.CANCELED,
+            stripe_subscription_id=None,
+            stripe_price_id=None,
+            current_period_end=None,
+            cancel_at_period_end=False,
+        )
+
+    async def _on_payment_failed(self, data: dict) -> None:
+        stripe_sub_id: str = data.get("subscription", "")
+        if not stripe_sub_id:
+            return
+        sub = await self.subscription_repo.get_by_stripe_subscription_id(stripe_sub_id)
+        if not sub:
+            return
+        await self.subscription_repo.update(sub, status=SubscriptionStatus.PAST_DUE)
+
+    def _plan_from_price(self, price_id: str) -> Plan:
+        price_map = _build_price_map()
+        for plan, pid in price_map.items():
+            if pid == price_id:
+                return plan
+        return Plan.PRO

@@ -1,20 +1,25 @@
-"""External service settings — Stripe, email. Empty stubs until Round 5."""
+"""Billing request schemas — validated input for billing endpoints."""
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
 # Third Party
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import BaseModel, HttpUrl
+
+# Internal
+from src.constants import Plan
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
 
-class ExternalSettings(BaseSettings):
-    """Third-party service API keys. Wired up in Round 5 (billing)."""
+class CreateCheckoutRequest(BaseModel):
+    """Initiate a Stripe checkout session to upgrade the org's plan."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    plan: Plan
+    success_url: HttpUrl
+    cancel_url: HttpUrl
 
-    STRIPE_SECRET_KEY: str = ""
-    STRIPE_WEBHOOK_SECRET: str = ""
-    STRIPE_PRO_PRICE_ID: str = ""
-    STRIPE_ENTERPRISE_PRICE_ID: str = ""
-    RESEND_API_KEY: str = ""
+
+class CreatePortalRequest(BaseModel):
+    """Open the Stripe customer portal for the org's billing management."""
+
+    return_url: HttpUrl

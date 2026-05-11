@@ -13,9 +13,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Internal
 from src.core.dependencies.auth import get_current_user
 from src.core.dependencies.database import get_db
+from src.repositories.billing import SubscriptionRepository
 from src.repositories.org import MembershipRepository, OrgRepository
 from src.repositories.user import UserRepository
 from src.schemas.auth import UserClaims
+from src.services.billing.service import BillingOrchestrator, StripeBillingService
 from src.services.org.service import OrgService
 from src.services.user.service import UserService
 
@@ -73,9 +75,28 @@ def get_org_service(session: DBSession) -> OrgService:
     )
 
 
+def get_billing_service(session: DBSession) -> BillingOrchestrator:
+    """Construct BillingOrchestrator with its repositories and Stripe service.
+
+    Args:
+        session (AsyncSession): The request-scoped DB session from get_db.
+
+    Returns:
+        BillingOrchestrator: Ready-to-use orchestrator instance.
+
+    """
+    return BillingOrchestrator(
+        subscription_repo=SubscriptionRepository(session),
+        org_repo=OrgRepository(session),
+        membership_repo=MembershipRepository(session),
+        billing_svc=StripeBillingService(),
+    )
+
+
 # Service aliases — defined after their factory functions.
 UserSvc: TypeAlias = Annotated[UserService, Depends(get_user_service)]
 OrgSvc: TypeAlias = Annotated[OrgService, Depends(get_org_service)]
+BillingSvc: TypeAlias = Annotated[BillingOrchestrator, Depends(get_billing_service)]
 
 __all__ = [
     "get_db",
@@ -83,9 +104,11 @@ __all__ = [
     "get_current_user_id",
     "get_user_service",
     "get_org_service",
+    "get_billing_service",
     "CurrentUserID",
     "CurrentUserClaims",
     "DBSession",
     "UserSvc",
     "OrgSvc",
+    "BillingSvc",
 ]

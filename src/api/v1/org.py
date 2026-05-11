@@ -86,8 +86,7 @@ async def list_members(
     service: OrgSvc,
 ) -> list[MemberResponse]:
     """List active members of an org. User must be a member."""
-    members = await service.list_members(org_id, user_id)
-    return [MemberResponse.model_validate(m) for m in members]
+    return await service.list_members(org_id, user_id)
 
 
 @router.post("/{org_id}/members", response_model=MemberResponse, status_code=201)
