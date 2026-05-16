@@ -54,6 +54,17 @@ class SubscriptionRepository(BaseRepository[Subscription]):
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def hard_delete_by_org(self, org_id: uuid.UUID) -> None:
+        """Hard-delete the subscription for an org — used during account/org deletion.
+
+        Args:
+            org_id (uuid.UUID): The org's UUID.
+
+        """
+        sub = await self.get_by_org(org_id)
+        if sub:
+            await self.hard_delete(sub)
+
     async def upsert_free(self, org_id: uuid.UUID) -> Subscription:
         """Ensure a FREE subscription row exists for an org. Creates it if missing.
 

@@ -238,3 +238,66 @@ async def test_remove_member_raises_forbidden_when_removing_last_owner():
 
     with pytest.raises(ForbiddenError, match="last owner"):
         await service.remove_member(uuid.uuid4(), requester_id=uuid.uuid4(), target_user_id=uuid.uuid4())
+
+
+# ── cleanup_for_deleted_user ──────────────────────────────────────────────────
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_cleanup_hard_deletes_sole_owned_org() -> None:
+    service, org_repo, membership_repo, _ = make_service()
+    user_id = uuid.uuid4()
+    org_id = uuid.uuid4()
+    org = make_org(id=org_id)
+    membership = make_membership(user_id=user_id, org_id=org_id, role=Role.OWNER)
+
+    membership_repo.get_user_memberships.return_value = [membership]
+    membership_repo.count_owners.return_value = 1
+    org_repo.get_by_id.return_value = org
+
+    await service.cleanup_for_deleted_user(user_id)
+
+    org_repo.hard_delete.assert_awaited_once_with(org)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_cleanup_does_not_delete_multi_owner_org() -> None:
+    service, org_repo, membership_repo, _ = make_service()
+    user_id = uuid.uuid4()
+    org_id = uuid.uuid4()
+    membership = make_membership(user_id=user_id, org_id=org_id, role=Role.OWNER)
+
+    membership_repo.get_user_memberships.return_value = [membership]
+    membership_repo.count_owners.return_value = 2
+
+    await service.cleanup_for_deleted_user(user_id)
+
+    org_repo.hard_delete.assert_not_awaited()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_cleanup_does_not_delete_non_owner_org() -> None:
+    service, org_repo, membership_repo, _ = make_service()
+    user_id = uuid.uuid4()
+    org_id = uuid.uuid4()
+    membership = make_membership(user_id=user_id, org_id=org_id, role=Role.MEMBER)
+
+    membership_repo.get_user_memberships.return_value = [membership]
+
+    await service.cleanup_for_deleted_user(user_id)
+
+    org_repo.hard_delete.assert_not_awaited()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_cleanup_no_op_when_no_memberships() -> None:
+    service, org_repo, membership_repo, _ = make_service()
+    membership_repo.get_user_memberships.return_value = []
+
+    await service.cleanup_for_deleted_user(uuid.uuid4())
+
+    org_repo.hard_delete.assert_not_awaited()

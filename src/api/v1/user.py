@@ -9,8 +9,7 @@ import uuid
 from fastapi import APIRouter, Request
 
 # Internal
-from src.constants import Plan
-from src.core.dependencies import CurrentUserClaims, CurrentUserID, UserSvc
+from src.core.dependencies import AuthSvc, CurrentUserClaims, CurrentUserID, OrgSvc, UserSvc
 from src.core.middleware.rate_limit import limiter
 from src.schemas.common import MessageResponse
 from src.schemas.user.requests import (
@@ -21,7 +20,6 @@ from src.schemas.user.requests import (
     UpdateProfileRequest,
 )
 from src.schemas.user.responses import UserMeResponse, UserProfileResponse
-from src.services.auth.service import AuthService
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
@@ -34,25 +32,27 @@ async def get_me(
     request: Request,
     claims: CurrentUserClaims,
     service: UserSvc,
+    org_service: OrgSvc,
 ) -> UserMeResponse:
     """Return the authenticated user's profile with billing and org context.
 
-    Creates the profile on first login using email from the verified JWT.
+    Creates the profile and personal org on first login (B2C pattern — idempotent).
+
+    B2B note: remove the org_service call and org_id field. Let clients call
+    POST /orgs to create named team workspaces explicitly during onboarding.
 
     """
     user_id = uuid.UUID(claims.sub)
-    user = await service.get_or_create(user_id, email=claims.email)
-    # No personal org is auto-created here. Users must create an org manually via the
-    # OrgSwitcher. For solo/consumer products, call OrgService.create()
-    # here with is_personal=True to give every new user a default workspace immediately.
+    user = await service.get_or_create(user_id, email=claims.email, full_name=claims.full_name)
+    org = await org_service.get_or_create_personal(user_id, email=claims.email)
     return UserMeResponse(
         id=user.id,
         email=user.email,
         first_name=user.first_name,
         last_name=user.last_name,
         created_at=user.created_at,
-        plan=Plan.FREE,
-        org_count=0,
+        org_count=1,
+        org_id=org.id,
     )
 
 
@@ -78,10 +78,10 @@ async def update_profile(
 async def request_password_reset(
     request: Request,
     body: RequestPasswordResetRequest,
+    auth_service: AuthSvc,
 ) -> MessageResponse:
     """Trigger a Supabase password reset email. Always returns success to prevent email enumeration."""
-    auth = AuthService()
-    await auth.send_password_reset(body.email)
+    await auth_service.send_password_reset(body.email)
     return MessageResponse(
         message="If that email exists, we've sent a reset link.",
         detail="Check your inbox.",
@@ -94,10 +94,10 @@ async def update_email(
     request: Request,
     body: UpdateEmailRequest,
     user_id: CurrentUserID,
+    auth_service: AuthSvc,
 ) -> MessageResponse:
     """Initiate an email change via the Supabase admin API."""
-    auth = AuthService()
-    await auth.update_email(user_id, str(body.new_email))
+    await auth_service.update_email(user_id, str(body.new_email))
     return MessageResponse(
         message="Email update initiated.",
         detail="Check your new address for a confirmation link.",
@@ -110,10 +110,10 @@ async def update_password(
     request: Request,
     body: UpdatePasswordRequest,
     user_id: CurrentUserID,
+    auth_service: AuthSvc,
 ) -> MessageResponse:
     """Update the authenticated user's password via the Supabase admin API."""
-    auth = AuthService()
-    await auth.update_password(user_id, body.new_password)
+    await auth_service.update_password(user_id, body.new_password)
     return MessageResponse(message="Password updated successfully.")
 
 
@@ -124,14 +124,23 @@ async def delete_account(
     body: DeleteAccountRequest,
     user_id: CurrentUserID,
     service: UserSvc,
+    org_service: OrgSvc,
+    auth_service: AuthSvc,
 ) -> MessageResponse:
-    """Soft-delete UserProfile then hard-delete the Supabase auth user.
+    """Hard-delete the user's profile and auth record.
+
+    Order: clean up sole-owned orgs (OrgService) → delete profile (UserService) →
+    delete Supabase auth user (AuthService). DB CASCADE handles memberships/subscriptions.
 
     body.confirmation must equal "DELETE MY ACCOUNT".
 
     """
-    auth_service = AuthService()
+    await org_service.cleanup_for_deleted_user(user_id)
     await service.delete(user_id)
+    # Auth delete runs last. If this fails after profile is already hard-deleted,
+    # the Supabase auth record lingers but the DB row is gone — user is locked out
+    # on next login. No automatic recovery; requires manual Supabase admin cleanup.
+    # Acceptable risk for a template; wrap in a retry/dead-letter queue for production.
     await auth_service.delete_user(user_id)
     return MessageResponse(
         message="Account deleted.",

@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Optional
 
 # Third Party
+import sqlalchemy as sa
 from sqlmodel import Field, SQLModel
 
 # Internal
@@ -33,8 +34,8 @@ class Subscription(UUIDMixin, TimestampMixin, SQLModel, table=True):
         index=True,
         nullable=False,
     )
-    plan: Plan = Field(default=Plan.FREE, nullable=False)
-    status: SubscriptionStatus = Field(default=SubscriptionStatus.ACTIVE, nullable=False)
+    plan: Plan = Field(default=Plan.FREE, nullable=False, sa_type=sa.Enum(Plan, name="plan", create_type=True))
+    status: SubscriptionStatus = Field(default=SubscriptionStatus.ACTIVE, nullable=False, sa_type=sa.Enum(SubscriptionStatus, name="subscriptionstatus", create_type=True))
     stripe_subscription_id: Optional[str] = Field(
         default=None,
         unique=True,
@@ -47,6 +48,7 @@ class Subscription(UUIDMixin, TimestampMixin, SQLModel, table=True):
     )
     current_period_end: Optional[datetime] = Field(
         default=None,
+        sa_type=sa.DateTime(timezone=True),
         description="UTC timestamp of the current billing period end",
     )
     cancel_at_period_end: bool = Field(

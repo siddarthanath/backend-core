@@ -4,6 +4,7 @@
 
 # Standard Library
 import uuid
+from dataclasses import dataclass
 from unittest.mock import AsyncMock, MagicMock
 
 # Third Party
@@ -17,10 +18,17 @@ from src.services.user.service import UserService
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
 
-def make_service() -> tuple[UserService, AsyncMock]:
+@dataclass
+class ServiceFixture:
+    service: UserService
+    repo: AsyncMock
+
+
+def make_service() -> ServiceFixture:
     """Return a UserService wired to a mocked repository."""
     repo = AsyncMock(spec=UserRepository)
-    return UserService(repo=repo), repo
+    service = UserService(repo=repo)
+    return ServiceFixture(service, repo)
 
 
 def make_profile(**kwargs: object) -> MagicMock:
@@ -36,38 +44,38 @@ def make_profile(**kwargs: object) -> MagicMock:
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_get_me_raises_not_found_when_no_profile() -> None:
-    service, repo = make_service()
-    repo.get_by_id.return_value = None
+    f = make_service()
+    f.repo.get_by_id.return_value = None
 
     with pytest.raises(NotFoundError):
-        await service.get_me(uuid.uuid4())
+        await f.service.get_me(uuid.uuid4())
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_get_me_returns_profile_when_found() -> None:
-    service, repo = make_service()
+    f = make_service()
     profile = make_profile()
     user_id = uuid.uuid4()
-    repo.get_by_id.return_value = profile
+    f.repo.get_by_id.return_value = profile
 
-    result = await service.get_me(user_id)
+    result = await f.service.get_me(user_id)
 
-    repo.get_by_id.assert_awaited_once_with(user_id)
+    f.repo.get_by_id.assert_awaited_once_with(user_id)
     assert result is profile
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_update_profile_passes_only_non_none_fields() -> None:
-    service, repo = make_service()
+    f = make_service()
     profile = make_profile()
-    repo.get_by_id.return_value = profile
-    repo.update.return_value = profile
+    f.repo.get_by_id.return_value = profile
+    f.repo.update.return_value = profile
 
-    await service.update_profile(uuid.uuid4(), first_name="Ada", last_name=None)
+    await f.service.update_profile(uuid.uuid4(), first_name="Ada", last_name=None)
 
-    _, kwargs = repo.update.call_args
+    _, kwargs = f.repo.update.call_args
     assert "first_name" in kwargs
     assert "last_name" not in kwargs
 
@@ -75,14 +83,14 @@ async def test_update_profile_passes_only_non_none_fields() -> None:
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_update_profile_passes_both_fields_when_provided() -> None:
-    service, repo = make_service()
+    f = make_service()
     profile = make_profile()
-    repo.get_by_id.return_value = profile
-    repo.update.return_value = profile
+    f.repo.get_by_id.return_value = profile
+    f.repo.update.return_value = profile
 
-    await service.update_profile(uuid.uuid4(), first_name="Ada", last_name="Lovelace")
+    await f.service.update_profile(uuid.uuid4(), first_name="Ada", last_name="Lovelace")
 
-    _, kwargs = repo.update.call_args
+    _, kwargs = f.repo.update.call_args
     assert kwargs["first_name"] == "Ada"
     assert kwargs["last_name"] == "Lovelace"
 
@@ -90,20 +98,36 @@ async def test_update_profile_passes_both_fields_when_provided() -> None:
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_delete_raises_not_found_when_no_profile() -> None:
-    service, repo = make_service()
-    repo.get_by_id.return_value = None
+    f = make_service()
+    f.repo.get_by_id.return_value = None
 
     with pytest.raises(NotFoundError):
-        await service.delete(uuid.uuid4())
+        await f.service.delete(uuid.uuid4())
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_delete_calls_soft_delete_on_profile() -> None:
-    service, repo = make_service()
-    profile = make_profile()
-    repo.get_by_id.return_value = profile
+async def test_delete_hard_deletes_profile() -> None:
+    f = make_service()
+    user_id = uuid.uuid4()
+    profile = make_profile(id=user_id)
+    f.repo.get_by_id.return_value = profile
 
-    await service.delete(uuid.uuid4())
+    await f.service.delete(user_id)
 
-    repo.soft_delete.assert_awaited_once_with(profile)
+    f.repo.hard_delete.assert_awaited_once_with(profile)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_delete_does_not_touch_orgs_or_memberships() -> None:
+    """UserService.delete only removes the profile — org cleanup is OrgService's job."""
+    f = make_service()
+    user_id = uuid.uuid4()
+    profile = make_profile(id=user_id)
+    f.repo.get_by_id.return_value = profile
+
+    await f.service.delete(user_id)
+
+    # Only one repo method should have been called beyond get_by_id
+    assert f.repo.hard_delete.await_count == 1

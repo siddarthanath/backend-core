@@ -17,6 +17,7 @@ from src.repositories.billing import SubscriptionRepository
 from src.repositories.org import MembershipRepository, OrgRepository
 from src.repositories.user import UserRepository
 from src.schemas.auth import UserClaims
+from src.services.auth.service import AuthService
 from src.services.billing.service import BillingOrchestrator, StripeBillingService
 from src.services.org.service import OrgService
 from src.services.user.service import UserService
@@ -75,6 +76,16 @@ def get_org_service(session: DBSession) -> OrgService:
     )
 
 
+def get_auth_service() -> AuthService:
+    """Construct AuthService — no DB session required (wraps Supabase Admin SDK).
+
+    Returns:
+        AuthService: Ready-to-use service instance.
+
+    """
+    return AuthService()
+
+
 def get_billing_service(session: DBSession) -> BillingOrchestrator:
     """Construct BillingOrchestrator with its repositories and Stripe service.
 
@@ -94,6 +105,7 @@ def get_billing_service(session: DBSession) -> BillingOrchestrator:
 
 
 # Service aliases — defined after their factory functions.
+AuthSvc: TypeAlias = Annotated[AuthService, Depends(get_auth_service)]
 UserSvc: TypeAlias = Annotated[UserService, Depends(get_user_service)]
 OrgSvc: TypeAlias = Annotated[OrgService, Depends(get_org_service)]
 BillingSvc: TypeAlias = Annotated[BillingOrchestrator, Depends(get_billing_service)]
@@ -102,12 +114,14 @@ __all__ = [
     "get_db",
     "get_current_user",
     "get_current_user_id",
+    "get_auth_service",
     "get_user_service",
     "get_org_service",
     "get_billing_service",
     "CurrentUserID",
     "CurrentUserClaims",
     "DBSession",
+    "AuthSvc",
     "UserSvc",
     "OrgSvc",
     "BillingSvc",

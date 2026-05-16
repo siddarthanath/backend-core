@@ -10,6 +10,8 @@ from src.core.exceptions.types import NotFoundError
 from src.models.user import UserProfile
 from src.repositories.user import UserRepository
 
+
+
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
 
@@ -19,18 +21,35 @@ class UserService:
     def __init__(self, repo: UserRepository) -> None:
         self.repo = repo
 
-    async def get_or_create(self, user_id: uuid.UUID, email: str) -> UserProfile:
+    async def get_or_create(
+        self,
+        user_id: uuid.UUID,
+        email: str,
+        full_name: str | None = None,
+    ) -> UserProfile:
         """Return existing profile or create one from Supabase auth data.
 
         Args:
             user_id (uuid.UUID): Supabase auth UUID (sub claim).
             email (str): Email from the verified JWT.
+            full_name (str | None): Display name from JWT user_metadata — split into first/last.
 
         Returns:
             UserProfile: The existing or newly created profile.
 
         """
-        return await self.repo.upsert_from_supabase(user_id=user_id, email=email)
+        first_name: str | None = None
+        last_name: str | None = None
+        if full_name:
+            parts = full_name.strip().split(" ", 1)
+            first_name = parts[0] or None
+            last_name = parts[1] if len(parts) > 1 else None
+        return await self.repo.upsert_from_supabase(
+            user_id=user_id,
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+        )
 
     async def get_me(self, user_id: uuid.UUID) -> UserProfile:
         """Fetch the authenticated user's profile.
@@ -76,7 +95,10 @@ class UserService:
         return await self.repo.update(user, **updates)
 
     async def delete(self, user_id: uuid.UUID) -> None:
-        """Soft-delete the user's profile. Auth deletion is handled by AuthService.
+        """Hard-delete the user profile. Memberships cascade at the DB level.
+
+        Org cleanup (sole-owned orgs) must be performed by the caller (via OrgService)
+        before this method is invoked. Auth hard-delete is handled by the caller (AuthService).
 
         Args:
             user_id (uuid.UUID): The authenticated user's UUID.
@@ -86,4 +108,4 @@ class UserService:
 
         """
         user = await self.get_me(user_id)
-        await self.repo.soft_delete(user)
+        await self.repo.hard_delete(user)

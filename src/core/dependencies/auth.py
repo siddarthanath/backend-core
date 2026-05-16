@@ -4,6 +4,7 @@
 
 # Third Party
 import jwt
+from jwt import PyJWKClient
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from structlog.contextvars import bind_contextvars
@@ -16,15 +17,16 @@ from src.schemas.auth import UserClaims
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
-# NOTE: Alternative — verify via Supabase Auth HTTP API (`supabase.auth.get_user(token)`).
-# That approach makes an HTTP call to Supabase on every authenticated request, enabling real-time
-# token revocation (useful for "logout from all devices" with instant effect). The tradeoff is
-# ~50-200ms added latency per request and a hard dependency on Supabase API availability.
-# Current approach (local PyJWT decode) is <1ms and fails only if the JWT secret is wrong.
-# Switch if real-time revocation becomes a product requirement — layer it on top by maintaining
-# a server-side blocklist of revoked `jti` claims checked after local decode.
+# NOTE: Newer Supabase projects sign JWTs with ES256 (asymmetric). Older projects used HS256
+# with a shared secret. PyJWKClient fetches the public keys from Supabase's JWKS endpoint once
+# and caches them — so local verification stays <1ms after the first request.
+# PROVIDER SWAP POINT: swap SUPABASE_URL + JWKS path for Auth0/Firebase JWKS URIs.
 
 _bearer = HTTPBearer()
+_jwks_client = PyJWKClient(
+    f"{auth_settings.SUPABASE_URL}/auth/v1/.well-known/jwks.json",
+    cache_keys=True,
+)
 
 
 async def get_current_user(
@@ -42,16 +44,12 @@ async def get_current_user(
         AuthException: If the token is missing, expired, or invalid.
 
     """
-    # PROVIDER SWAP POINT (backend)
-    # If/when you swap auth providers, you rewrite lib/supabase/client.ts (frontend) + this block —
-    # the rest of the app (repositories, services, endpoints) doesn't change.
-    # Supabase uses HS256 + shared JWT secret. Auth0/Firebase use RS256 + JWKS endpoint —
-    # swap algorithm, key source, and audience claim accordingly. UserClaims shape stays the same.
     try:
+        signing_key = _jwks_client.get_signing_key_from_jwt(credentials.credentials)
         payload = jwt.decode(
             credentials.credentials,
-            auth_settings.SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
+            signing_key.key,
+            algorithms=["ES256", "RS256", "HS256"],
             audience="authenticated",
             issuer=f"{auth_settings.SUPABASE_URL}/auth/v1",
             leeway=10,
@@ -65,6 +63,7 @@ async def get_current_user(
         sub=payload["sub"],
         email=payload.get("email", ""),
         role=payload.get("role", "authenticated"),
+        full_name=payload.get("user_metadata", {}).get("full_name"),
     )
     set_request_user_id(claims.sub)
     # Bind to user to flow into all downstream logs

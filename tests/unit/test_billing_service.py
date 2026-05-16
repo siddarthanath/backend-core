@@ -255,3 +255,201 @@ async def test_handle_webhook_ignores_unknown_event_type():
     await orchestrator.handle_webhook(b"payload", "sig")
 
     subscription_repo.update.assert_not_awaited()
+
+
+def make_stripe_subscription_dict(*, price_id: str = "price_pro_monthly", period_end: int = 9999999999) -> dict:
+    """Return a minimal dict shaped like stripe.Subscription.to_dict()."""
+    return {
+        "id": "sub_test123",
+        "status": "active",
+        "cancel_at_period_end": False,
+        "items": {
+            "data": [{
+                "price": {"id": price_id},
+                "current_period_end": period_end,
+            }]
+        },
+    }
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_checkout_completed_activates_subscription():
+    orchestrator, subscription_repo, org_repo, _, billing_svc = make_orchestrator()
+    org_id = uuid.uuid4()
+    org = make_org(id=org_id, stripe_customer_id=None)
+    sub = make_subscription(org_id=org_id, plan=Plan.FREE)
+
+    billing_svc.parse_webhook.return_value = {
+        "type": "checkout.session.completed",
+        "data": {"object": {
+            "metadata": {"org_id": str(org_id)},
+            "subscription": "sub_test123",
+            "customer": "cus_test123",
+        }},
+    }
+    org_repo.get_by_id.return_value = org
+    subscription_repo.get_by_org.return_value = sub
+
+    stripe_sub_dict = make_stripe_subscription_dict(price_id="price_pro_monthly")
+    with patch("src.services.billing.service._build_price_map", return_value={(Plan.PRO, BillingPeriod.MONTHLY): "price_pro_monthly"}):
+        with patch("anyio.to_thread.run_sync", new_callable=AsyncMock, return_value=MagicMock(to_dict=lambda: stripe_sub_dict)):
+            await orchestrator.handle_webhook(b"payload", "sig")
+
+    subscription_repo.update.assert_awaited_once()
+    _, kwargs = subscription_repo.update.call_args
+    assert kwargs["plan"] == Plan.PRO
+    assert kwargs["status"] == SubscriptionStatus.ACTIVE
+    assert kwargs["stripe_subscription_id"] == "sub_test123"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_checkout_completed_writes_stripe_customer_id_to_org():
+    orchestrator, subscription_repo, org_repo, _, billing_svc = make_orchestrator()
+    org_id = uuid.uuid4()
+    org = make_org(id=org_id, stripe_customer_id=None)
+    sub = make_subscription(org_id=org_id)
+
+    billing_svc.parse_webhook.return_value = {
+        "type": "checkout.session.completed",
+        "data": {"object": {
+            "metadata": {"org_id": str(org_id)},
+            "subscription": "sub_test123",
+            "customer": "cus_new123",
+        }},
+    }
+    org_repo.get_by_id.return_value = org
+    subscription_repo.get_by_org.return_value = sub
+
+    stripe_sub_dict = make_stripe_subscription_dict()
+    with patch("src.services.billing.service._build_price_map", return_value={(Plan.PRO, BillingPeriod.MONTHLY): "price_pro_monthly"}):
+        with patch("anyio.to_thread.run_sync", new_callable=AsyncMock, return_value=MagicMock(to_dict=lambda: stripe_sub_dict)):
+            await orchestrator.handle_webhook(b"payload", "sig")
+
+    org_repo.update.assert_awaited_once_with(org, stripe_customer_id="cus_new123")
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_checkout_completed_skips_customer_update_if_already_set():
+    orchestrator, subscription_repo, org_repo, _, billing_svc = make_orchestrator()
+    org_id = uuid.uuid4()
+    org = make_org(id=org_id, stripe_customer_id="cus_existing")
+    sub = make_subscription(org_id=org_id)
+
+    billing_svc.parse_webhook.return_value = {
+        "type": "checkout.session.completed",
+        "data": {"object": {
+            "metadata": {"org_id": str(org_id)},
+            "subscription": "sub_test123",
+            "customer": "cus_existing",
+        }},
+    }
+    org_repo.get_by_id.return_value = org
+    subscription_repo.get_by_org.return_value = sub
+
+    stripe_sub_dict = make_stripe_subscription_dict()
+    with patch("src.services.billing.service._build_price_map", return_value={(Plan.PRO, BillingPeriod.MONTHLY): "price_pro_monthly"}):
+        with patch("anyio.to_thread.run_sync", new_callable=AsyncMock, return_value=MagicMock(to_dict=lambda: stripe_sub_dict)):
+            await orchestrator.handle_webhook(b"payload", "sig")
+
+    org_repo.update.assert_not_awaited()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_checkout_completed_does_nothing_if_org_missing():
+    orchestrator, subscription_repo, org_repo, _, billing_svc = make_orchestrator()
+    billing_svc.parse_webhook.return_value = {
+        "type": "checkout.session.completed",
+        "data": {"object": {
+            "metadata": {"org_id": str(uuid.uuid4())},
+            "subscription": "sub_test123",
+            "customer": "cus_test123",
+        }},
+    }
+    org_repo.get_by_id.return_value = None
+
+    await orchestrator.handle_webhook(b"payload", "sig")
+
+    subscription_repo.update.assert_not_awaited()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_subscription_updated_changes_plan_and_status():
+    orchestrator, subscription_repo, _, _, billing_svc = make_orchestrator()
+    sub = make_subscription(plan=Plan.FREE)
+    subscription_repo.get_by_stripe_subscription_id.return_value = sub
+
+    billing_svc.parse_webhook.return_value = {
+        "type": "customer.subscription.updated",
+        "data": {"object": {
+            "id": "sub_test123",
+            "status": "active",
+            "cancel_at_period_end": True,
+            "items": {"data": [{"price": {"id": "price_pro_monthly"}, "current_period_end": 9999999999}]},
+        }},
+    }
+
+    with patch("src.services.billing.service._build_price_map", return_value={(Plan.PRO, BillingPeriod.MONTHLY): "price_pro_monthly"}):
+        await orchestrator.handle_webhook(b"payload", "sig")
+
+    _, kwargs = subscription_repo.update.call_args
+    assert kwargs["plan"] == Plan.PRO
+    assert kwargs["cancel_at_period_end"] is True
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_subscription_deleted_resets_to_free():
+    orchestrator, subscription_repo, _, _, billing_svc = make_orchestrator()
+    sub = make_subscription(plan=Plan.PRO, stripe_subscription_id="sub_test123")
+    subscription_repo.get_by_stripe_subscription_id.return_value = sub
+
+    billing_svc.parse_webhook.return_value = {
+        "type": "customer.subscription.deleted",
+        "data": {"object": {"id": "sub_test123"}},
+    }
+
+    await orchestrator.handle_webhook(b"payload", "sig")
+
+    _, kwargs = subscription_repo.update.call_args
+    assert kwargs["plan"] == Plan.FREE
+    assert kwargs["status"] == SubscriptionStatus.CANCELED
+    assert kwargs["stripe_subscription_id"] is None
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_payment_failed_sets_past_due():
+    orchestrator, subscription_repo, _, _, billing_svc = make_orchestrator()
+    sub = make_subscription(plan=Plan.PRO)
+    subscription_repo.get_by_stripe_subscription_id.return_value = sub
+
+    billing_svc.parse_webhook.return_value = {
+        "type": "invoice.payment_failed",
+        "data": {"object": {"subscription": "sub_test123"}},
+    }
+
+    await orchestrator.handle_webhook(b"payload", "sig")
+
+    _, kwargs = subscription_repo.update.call_args
+    assert kwargs["status"] == SubscriptionStatus.PAST_DUE
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_payment_failed_does_nothing_if_subscription_not_found():
+    orchestrator, subscription_repo, _, _, billing_svc = make_orchestrator()
+    subscription_repo.get_by_stripe_subscription_id.return_value = None
+
+    billing_svc.parse_webhook.return_value = {
+        "type": "invoice.payment_failed",
+        "data": {"object": {"subscription": "sub_missing"}},
+    }
+
+    await orchestrator.handle_webhook(b"payload", "sig")
+
+    subscription_repo.update.assert_not_awaited()

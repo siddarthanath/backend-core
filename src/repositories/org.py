@@ -130,6 +130,32 @@ class MembershipRepository(BaseRepository[Membership]):
         result = await self.session.execute(stmt)
         return result.scalar_one()
 
+    async def get_user_memberships(self, user_id: uuid.UUID) -> list[Membership]:
+        """Return all memberships for a user regardless of status.
+
+        Args:
+            user_id (uuid.UUID): The user's UUID.
+
+        Returns:
+            list[Membership]: All membership records for the user.
+
+        """
+        stmt = select(Membership).where(Membership.user_id == user_id)
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def delete_all_for_user(self, user_id: uuid.UUID) -> None:
+        """Hard-delete all membership records for a user.
+
+        Args:
+            user_id (uuid.UUID): The user's UUID.
+
+        """
+        memberships = await self.get_user_memberships(user_id)
+        for m in memberships:
+            await self.session.delete(m)
+        await self.session.flush()
+
     async def user_has_role(
         self,
         user_id: uuid.UUID,
