@@ -45,11 +45,9 @@ def upgrade() -> None:
     sa.Column('email', sqlmodel.sql.sqltypes.AutoString(length=320), nullable=False),
     sa.Column('first_name', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=True),
     sa.Column('last_name', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=True),
-    sa.Column('stripe_customer_id', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_user_profiles_email'), 'user_profiles', ['email'], unique=True)
-    op.create_index(op.f('ix_user_profiles_stripe_customer_id'), 'user_profiles', ['stripe_customer_id'], unique=True)
     
     op.create_table('memberships',
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
@@ -60,9 +58,9 @@ def upgrade() -> None:
     sa.Column('role', sa.Enum('OWNER', 'ADMIN', 'MEMBER', name='role'), nullable=False),
     sa.Column('status', sa.Enum('ACTIVE', 'INVITED', 'SUSPENDED', name='membershipstatus'), nullable=False),
     sa.Column('invited_by', sa.Uuid(), nullable=True),
-    sa.ForeignKeyConstraint(['invited_by'], ['user_profiles.id'], ),
-    sa.ForeignKeyConstraint(['org_id'], ['organisations.id'], ),
-    sa.ForeignKeyConstraint(['user_id'], ['user_profiles.id'], ),
+    sa.ForeignKeyConstraint(['invited_by'], ['user_profiles.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['org_id'], ['organisations.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['user_id'], ['user_profiles.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('user_id', 'org_id', name='uq_membership_user_org')
     )
@@ -80,7 +78,7 @@ def upgrade() -> None:
     sa.Column('stripe_price_id', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('current_period_end', sa.DateTime(timezone=True), nullable=True),
     sa.Column('cancel_at_period_end', sa.Boolean(), nullable=False),
-    sa.ForeignKeyConstraint(['org_id'], ['organisations.id'], ),
+    sa.ForeignKeyConstraint(['org_id'], ['organisations.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_subscriptions_org_id'), 'subscriptions', ['org_id'], unique=True)
@@ -125,7 +123,7 @@ def upgrade() -> None:
     sa.Column('created_by', sa.Uuid(), nullable=True),
     sa.Column('name', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=False),
     sa.Column('key_prefix', sqlmodel.sql.sqltypes.AutoString(length=16), nullable=False),
-    sa.Column('key_hash', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('key_hash', sa.String(64), nullable=False),
     sa.Column('last_used_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('expires_at', sa.DateTime(timezone=True), nullable=True),
     sa.ForeignKeyConstraint(['created_by'], ['user_profiles.id'], ondelete='SET NULL'),
@@ -151,7 +149,6 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_memberships_user_id'), table_name='memberships')
     op.drop_index(op.f('ix_memberships_org_id'), table_name='memberships')
     op.drop_table('memberships')
-    op.drop_index(op.f('ix_user_profiles_stripe_customer_id'), table_name='user_profiles')
     op.drop_index(op.f('ix_user_profiles_email'), table_name='user_profiles')
     op.drop_table('user_profiles')
     op.drop_index(op.f('ix_organisations_stripe_customer_id'), table_name='organisations')

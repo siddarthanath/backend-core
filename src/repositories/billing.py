@@ -81,8 +81,11 @@ class SubscriptionRepository(BaseRepository[Subscription]):
         if existing:
             return existing
         try:
-            return await self.create(
-                Subscription(org_id=org_id, plan=Plan.FREE, status=SubscriptionStatus.ACTIVE)
-            )
+            # Savepoint isolates the insert — IntegrityError rolls back only to here,
+            # leaving the outer transaction alive for the fallback get_by_org.
+            async with self.session.begin_nested():
+                return await self.create(
+                    Subscription(org_id=org_id, plan=Plan.FREE, status=SubscriptionStatus.ACTIVE)
+                )
         except IntegrityError:
             return await self.get_by_org(org_id)  # type: ignore[return-value]

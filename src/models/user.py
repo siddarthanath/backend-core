@@ -36,9 +36,3 @@ class UserProfile(TimestampMixin, SoftDeleteMixin, SQLModel, table=True):
     )
     first_name: str | None = Field(default=None, max_length=100)
     last_name: str | None = Field(default=None, max_length=100)
-    stripe_customer_id: str | None = Field(
-        default=None,
-        unique=True,
-        index=True,
-        description="Stripe customer ID — set when user initiates first checkout",
-    )

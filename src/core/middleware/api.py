@@ -37,7 +37,7 @@ class APILoggingMiddleware(BaseHTTPMiddleware):
         if path in SKIP_PATHS:
             return await call_next(request)  # type: ignore[misc]
 
-        debug_enabled = log.isEnabledFor(logging.DEBUG)
+        debug_enabled = log.is_enabled_for(logging.DEBUG)
 
         if debug_enabled and request.method != "GET" and path not in STREAMING_PATHS:
             try:
