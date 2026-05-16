@@ -46,12 +46,19 @@ class UserRepository(BaseRepository[UserProfile]):
         *,
         user_id: uuid.UUID,
         email: str,
+        first_name: str | None = None,
+        last_name: str | None = None,
     ) -> UserProfile:
         """Return existing profile or create one from Supabase auth data.
+
+        Names are only written on first insert — ON CONFLICT DO NOTHING means any
+        user-updated names are never overwritten by JWT metadata on subsequent logins.
 
         Args:
             user_id (uuid.UUID): Supabase auth UUID (sub claim).
             email (str): Email from the verified JWT.
+            first_name (str | None): From JWT user_metadata.full_name split, first login only.
+            last_name (str | None): From JWT user_metadata.full_name split, first login only.
 
         Returns:
             UserProfile: The existing or newly created profile.
@@ -59,9 +66,14 @@ class UserRepository(BaseRepository[UserProfile]):
         """
         # INSERT ... ON CONFLICT DO NOTHING is atomic — eliminates the race condition where two
         # concurrent first requests for the same user both see no row and both attempt to insert.
+        values: dict = {"id": user_id, "email": email}
+        if first_name is not None:
+            values["first_name"] = first_name
+        if last_name is not None:
+            values["last_name"] = last_name
         stmt = (
             pg_insert(UserProfile)
-            .values(id=user_id, email=email)
+            .values(**values)
             .on_conflict_do_nothing(index_elements=["id"])
         )
         await self.session.execute(stmt)

@@ -29,6 +29,32 @@ class OrgService:
         self.membership_repo = membership_repo
         self.user_repo = user_repo
 
+    async def get_or_create_personal(self, user_id: uuid.UUID, email: str) -> Organisation:
+        """Return the user's personal org, creating it on first call.
+
+        Idempotent — safe to call on every login. The org slug is derived from
+        the user_id so it is guaranteed unique without a slug-check round-trip.
+
+        B2B note: personal orgs are invisible in B2B products. In B2B, remove this
+        call from get_me and expose POST /orgs so teams create named workspaces.
+
+        Args:
+            user_id (uuid.UUID): The authenticated user's UUID.
+            email (str): Used as the org display name (never shown in B2C UI).
+
+        Returns:
+            Organisation: The personal org (existing or newly created).
+
+        """
+        # Subscription row is NOT created here — upsert_free in BillingService handles
+        # it lazily on first billing call. Injecting SubscriptionRepository here would
+        # couple two unrelated services for zero practical benefit.
+        slug = str(user_id)
+        existing = await self.org_repo.get_by_slug(slug)
+        if existing:
+            return existing
+        return await self.create_org(user_id, name=email, slug=slug, is_personal=True)
+
     async def list_my_orgs(self, user_id: uuid.UUID) -> list[Organisation]:
         """Return all orgs the user is an active member of.
 
@@ -253,6 +279,24 @@ class OrgService:
             raise NotFoundError("Membership", target_user_id)
 
         return await self.membership_repo.update(membership, role=new_role)
+
+    async def cleanup_for_deleted_user(self, user_id: uuid.UUID) -> None:
+        """Hard-delete orgs where this user is the sole owner.
+
+        Called during account deletion before the user profile is removed.
+        Subscriptions and memberships for deleted orgs cascade at the DB level.
+
+        Args:
+            user_id (uuid.UUID): The user being deleted.
+
+        """
+        memberships = await self.membership_repo.get_user_memberships(user_id)
+        for membership in memberships:
+            if membership.role == Role.OWNER:
+                if await self.membership_repo.count_owners(membership.org_id) == 1:
+                    org = await self.org_repo.get_by_id(membership.org_id)
+                    if org:
+                        await self.org_repo.hard_delete(org)
 
     async def remove_member(
         self,

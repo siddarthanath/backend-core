@@ -37,8 +37,24 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         set_request_id(request_id)
 
         start = time.perf_counter()
-        response = await call_next(request)
-        duration_ms = (time.perf_counter() - start) * 1000
+        try:
+            response = await call_next(request)
+        except Exception:
+            duration_ms = round(
+                (time.perf_counter() - start) * 1000,
+                1,
+            )
+
+            log.exception(
+                "request.failed",
+                duration_ms=duration_ms,
+            )
+
+            raise
+        duration_ms = round(
+            (time.perf_counter() - start) * 1000,
+            1,
+        )
 
         log.info(
             "request.complete",

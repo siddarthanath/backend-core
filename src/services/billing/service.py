@@ -70,10 +70,12 @@ class StripeBillingService(BaseBillingService):
             "cancel_url": cancel_url,
             "metadata": {"org_id": org_id},
         }
+        # ONE-TIME CREDIT TOP-UPS: if the product later supports purchasing usage credits
+        # (e.g. extra AI quota), create a separate checkout handler using mode="payment"
+        # with customer_creation="always". Do NOT add it here — this method is
+        # subscription-only. Stripe auto-creates a customer in subscription mode.
         if customer_id:
             params["customer"] = customer_id
-        else:
-            params["customer_creation"] = "always"
 
         session = await anyio.to_thread.run_sync(lambda: stripe.checkout.Session.create(**params))
         return session.url, session.customer  # type: ignore[return-value]
@@ -89,9 +91,11 @@ class StripeBillingService(BaseBillingService):
             str: Stripe portal session URL.
 
         """
-        session = stripe.billing_portal.Session.create(
-            customer=customer_id,
-            return_url=return_url,
+        session = await anyio.to_thread.run_sync(
+            lambda: stripe.billing_portal.Session.create(
+                customer=customer_id,
+                return_url=return_url,
+            )
         )
         return session.url  # type: ignore[return-value]
 
@@ -113,7 +117,7 @@ class StripeBillingService(BaseBillingService):
             event = stripe.Webhook.construct_event(payload, sig_header, self._webhook_secret)
         except stripe.SignatureVerificationError as exc:
             raise ValueError("Invalid Stripe webhook signature") from exc
-        return dict(event)
+        return event.to_dict()
 
 
 class BillingOrchestrator:
@@ -282,6 +286,7 @@ class BillingOrchestrator:
     async def _on_checkout_completed(self, data: dict) -> None:
         org_id_str: str = data.get("metadata", {}).get("org_id", "")
         stripe_sub_id: str = data.get("subscription", "")
+        stripe_customer_id: str = data.get("customer", "")
         if not org_id_str or not stripe_sub_id:
             return
 
@@ -291,15 +296,25 @@ class BillingOrchestrator:
             log.warning("billing.webhook_invalid_org_id", org_id=org_id_str)
             return
 
+        org = await self.org_repo.get_by_id(org_id)
+        if not org:
+            return
+
+        # customer is guaranteed populated on checkout.session.completed — write it now
+        if not org.stripe_customer_id and stripe_customer_id:
+            await self.org_repo.update(org, stripe_customer_id=stripe_customer_id)
+
         sub = await self.subscription_repo.get_by_org(org_id)
         if not sub:
             return
 
-        stripe_sub = await anyio.to_thread.run_sync(lambda: stripe.Subscription.retrieve(stripe_sub_id))
-        price_id: str = stripe_sub["items"]["data"][0]["price"]["id"]
+        raw_sub = await anyio.to_thread.run_sync(lambda: stripe.Subscription.retrieve(stripe_sub_id))
+        stripe_sub: dict = raw_sub.to_dict()
+        item = stripe_sub["items"]["data"][0]
+        price_id: str = item["price"]["id"]
         plan = self._plan_from_price(price_id)
         period_end = datetime.fromtimestamp(
-            stripe_sub["current_period_end"], tz=timezone.utc
+            item["current_period_end"], tz=timezone.utc
         )
 
         await self.subscription_repo.update(
@@ -319,14 +334,15 @@ class BillingOrchestrator:
         if not sub:
             return
 
-        price_id: str = data["items"]["data"][0]["price"]["id"]
+        item = data["items"]["data"][0]
+        price_id: str = item["price"]["id"]
         plan = self._plan_from_price(price_id)
         status_str: str = data.get("status", "active")
         try:
             status = SubscriptionStatus(status_str)
         except ValueError:
             status = SubscriptionStatus.ACTIVE
-        period_end = datetime.fromtimestamp(data["current_period_end"], tz=timezone.utc)
+        period_end = datetime.fromtimestamp(item["current_period_end"], tz=timezone.utc)
 
         await self.subscription_repo.update(
             sub,
