@@ -54,7 +54,10 @@ class APILoggingMiddleware(BaseHTTPMiddleware):
 
         response = await call_next(request)  # type: ignore[misc]
 
-        if not debug_enabled or isinstance(response, StreamingResponse) or path in STREAMING_PATHS:
+        content_type = response.headers.get("content-type", "")
+        is_json = "application/json" in content_type
+
+        if not debug_enabled or not is_json or isinstance(response, StreamingResponse) or path in STREAMING_PATHS:
             return response
 
         try:

@@ -91,9 +91,11 @@ class StripeBillingService(BaseBillingService):
             str: Stripe portal session URL.
 
         """
-        session = stripe.billing_portal.Session.create(
-            customer=customer_id,
-            return_url=return_url,
+        session = await anyio.to_thread.run_sync(
+            lambda: stripe.billing_portal.Session.create(
+                customer=customer_id,
+                return_url=return_url,
+            )
         )
         return session.url  # type: ignore[return-value]
 
