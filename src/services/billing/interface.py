@@ -69,3 +69,24 @@ class BaseBillingService(ABC):
 
         """
         raise NotImplementedError("Subclasses must implement this method!")
+
+    @abstractmethod
+    async def modify_subscription(self, stripe_sub_id: str, price_id: str) -> None:
+        """Swap the price on an active subscription (immediate upgrade with proration).
+
+        Args:
+            stripe_sub_id (str): Stripe subscription ID to modify.
+            price_id (str): New Stripe price ID for the target plan/period.
+
+        """
+        raise NotImplementedError("Subclasses must implement this method!")
+
+    @abstractmethod
+    async def cancel_subscription(self, stripe_sub_id: str) -> None:
+        """Mark a subscription to cancel at the end of the current billing period.
+
+        Args:
+            stripe_sub_id (str): Stripe subscription ID to cancel.
+
+        """
+        raise NotImplementedError("Subclasses must implement this method!")

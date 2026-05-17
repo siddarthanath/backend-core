@@ -78,6 +78,7 @@ def upgrade() -> None:
     sa.Column('stripe_price_id', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('current_period_end', sa.DateTime(timezone=True), nullable=True),
     sa.Column('cancel_at_period_end', sa.Boolean(), nullable=False),
+    sa.Column('cancellation_reason', sa.String(length=500), nullable=True),
     sa.ForeignKeyConstraint(['org_id'], ['organisations.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )

@@ -55,3 +55,7 @@ class Subscription(UUIDMixin, TimestampMixin, SQLModel, table=True):
         default=False,
         description="True when the user has requested cancellation at period end",
     )
+    cancellation_reason: Optional[str] = Field(
+        default=None,
+        description="Reason captured from the in-app cancellation modal; NULL for portal cancellations",
+    )

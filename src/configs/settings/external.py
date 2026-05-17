@@ -21,3 +21,5 @@ class ExternalSettings(BaseSettings):
     STRIPE_MAX_YEARLY_PRICE_ID: str = ""
     # Enterprise uses custom pricing — no Stripe price IDs needed (handled via sales/contact)
     RESEND_API_KEY: str = ""
+    # "From" address for all transactional emails, e.g. "App <noreply@yourdomain.com>"
+    EMAIL_FROM: str = ""
