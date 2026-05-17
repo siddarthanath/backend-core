@@ -284,7 +284,9 @@ class BillingOrchestrator:
             # No active paid sub — caller should use create_checkout instead
             raise ForbiddenError("No active subscription to upgrade — use checkout to start one")
 
-        if sub.plan == plan:
+        _PLAN_ORDER: dict[Plan, int] = {Plan.FREE: 0, Plan.PRO: 1, Plan.MAX: 2, Plan.ENTERPRISE: 3}
+        if _PLAN_ORDER.get(plan, 0) <= _PLAN_ORDER.get(sub.plan, 0):
+            # Same tier or downgrade — must go through the Stripe portal
             raise ConflictError("Subscription", "plan", plan.value)
 
         price_map = _build_price_map()
@@ -426,7 +428,7 @@ class BillingOrchestrator:
         price_id: str = item["price"]["id"]
         plan = self._plan_from_price(price_id)
         period_end = datetime.fromtimestamp(
-            item["current_period_end"], tz=timezone.utc
+            stripe_sub["current_period_end"], tz=timezone.utc
         )
 
         await self.subscription_repo.update(
@@ -454,7 +456,7 @@ class BillingOrchestrator:
             status = SubscriptionStatus(status_str)
         except ValueError:
             status = SubscriptionStatus.ACTIVE
-        period_end = datetime.fromtimestamp(item["current_period_end"], tz=timezone.utc)
+        period_end = datetime.fromtimestamp(data["current_period_end"], tz=timezone.utc)
 
         # cancellation_details.feedback is intentionally not read here — Stripe's built-in
         # cancellation survey is disabled in favour of our own in-app modal, so this field
