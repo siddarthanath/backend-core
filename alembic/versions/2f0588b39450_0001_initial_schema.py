@@ -36,6 +36,7 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_organisations_slug'), 'organisations', ['slug'], unique=True)
     op.create_index(op.f('ix_organisations_stripe_customer_id'), 'organisations', ['stripe_customer_id'], unique=True)
+    
     op.create_table('user_profiles',
     sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
@@ -44,11 +45,10 @@ def upgrade() -> None:
     sa.Column('email', sqlmodel.sql.sqltypes.AutoString(length=320), nullable=False),
     sa.Column('first_name', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=True),
     sa.Column('last_name', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=True),
-    sa.Column('stripe_customer_id', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_user_profiles_email'), 'user_profiles', ['email'], unique=True)
-    op.create_index(op.f('ix_user_profiles_stripe_customer_id'), 'user_profiles', ['stripe_customer_id'], unique=True)
+    
     op.create_table('memberships',
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
@@ -58,14 +58,15 @@ def upgrade() -> None:
     sa.Column('role', sa.Enum('OWNER', 'ADMIN', 'MEMBER', name='role'), nullable=False),
     sa.Column('status', sa.Enum('ACTIVE', 'INVITED', 'SUSPENDED', name='membershipstatus'), nullable=False),
     sa.Column('invited_by', sa.Uuid(), nullable=True),
-    sa.ForeignKeyConstraint(['invited_by'], ['user_profiles.id'], ),
-    sa.ForeignKeyConstraint(['org_id'], ['organisations.id'], ),
-    sa.ForeignKeyConstraint(['user_id'], ['user_profiles.id'], ),
+    sa.ForeignKeyConstraint(['invited_by'], ['user_profiles.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['org_id'], ['organisations.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['user_id'], ['user_profiles.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('user_id', 'org_id', name='uq_membership_user_org')
     )
     op.create_index(op.f('ix_memberships_org_id'), 'memberships', ['org_id'], unique=False)
     op.create_index(op.f('ix_memberships_user_id'), 'memberships', ['user_id'], unique=False)
+    
     op.create_table('subscriptions',
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
@@ -77,23 +78,78 @@ def upgrade() -> None:
     sa.Column('stripe_price_id', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('current_period_end', sa.DateTime(timezone=True), nullable=True),
     sa.Column('cancel_at_period_end', sa.Boolean(), nullable=False),
-    sa.ForeignKeyConstraint(['org_id'], ['organisations.id'], ),
+    sa.Column('cancellation_reason', sa.String(length=500), nullable=True),
+    sa.ForeignKeyConstraint(['org_id'], ['organisations.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_subscriptions_org_id'), 'subscriptions', ['org_id'], unique=True)
     op.create_index(op.f('ix_subscriptions_stripe_subscription_id'), 'subscriptions', ['stripe_subscription_id'], unique=True)
+    
+    op.create_table('audit_logs',
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('id', sa.Uuid(), nullable=False),
+    sa.Column('org_id', sa.Uuid(), nullable=False),
+    sa.Column('actor_id', sa.Uuid(), nullable=True),
+    sa.Column('action', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=False),
+    sa.Column('resource_type', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=False),
+    sa.Column('resource_id', sqlmodel.sql.sqltypes.AutoString(length=200), nullable=True),
+    sa.Column('event_metadata', sa.JSON(), nullable=True),
+    sa.ForeignKeyConstraint(['actor_id'], ['user_profiles.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['org_id'], ['organisations.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_audit_logs_org_id'), 'audit_logs', ['org_id'], unique=False)
+   
+    op.create_table('feature_flags',
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('id', sa.Uuid(), nullable=False),
+    sa.Column('org_id', sa.Uuid(), nullable=False),
+    sa.Column('key', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=False),
+    sa.Column('enabled', sa.Boolean(), nullable=False),
+    sa.Column('description', sqlmodel.sql.sqltypes.AutoString(length=300), nullable=True),
+    sa.ForeignKeyConstraint(['org_id'], ['organisations.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('org_id', 'key', name='uq_feature_flag_org_key')
+    )
+    op.create_index(op.f('ix_feature_flags_org_id'), 'feature_flags', ['org_id'], unique=False)
+   
+    op.create_table('api_keys',
+    sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('id', sa.Uuid(), nullable=False),
+    sa.Column('org_id', sa.Uuid(), nullable=False),
+    sa.Column('created_by', sa.Uuid(), nullable=True),
+    sa.Column('name', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=False),
+    sa.Column('key_prefix', sqlmodel.sql.sqltypes.AutoString(length=16), nullable=False),
+    sa.Column('key_hash', sa.String(64), nullable=False),
+    sa.Column('last_used_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('expires_at', sa.DateTime(timezone=True), nullable=True),
+    sa.ForeignKeyConstraint(['created_by'], ['user_profiles.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['org_id'], ['organisations.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('key_hash')
+    )
+    op.create_index(op.f('ix_api_keys_org_id'), 'api_keys', ['org_id'], unique=False)
     # ### end Alembic commands ###
 
 
 def downgrade() -> None:
     # ### commands auto generated by Alembic - please adjust! ###
+    op.drop_index(op.f('ix_api_keys_org_id'), table_name='api_keys')
+    op.drop_table('api_keys')
+    op.drop_index(op.f('ix_feature_flags_org_id'), table_name='feature_flags')
+    op.drop_table('feature_flags')
+    op.drop_index(op.f('ix_audit_logs_org_id'), table_name='audit_logs')
+    op.drop_table('audit_logs')
     op.drop_index(op.f('ix_subscriptions_stripe_subscription_id'), table_name='subscriptions')
     op.drop_index(op.f('ix_subscriptions_org_id'), table_name='subscriptions')
     op.drop_table('subscriptions')
     op.drop_index(op.f('ix_memberships_user_id'), table_name='memberships')
     op.drop_index(op.f('ix_memberships_org_id'), table_name='memberships')
     op.drop_table('memberships')
-    op.drop_index(op.f('ix_user_profiles_stripe_customer_id'), table_name='user_profiles')
     op.drop_index(op.f('ix_user_profiles_email'), table_name='user_profiles')
     op.drop_table('user_profiles')
     op.drop_index(op.f('ix_organisations_stripe_customer_id'), table_name='organisations')

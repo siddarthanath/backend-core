@@ -11,7 +11,12 @@ from fastapi import APIRouter, Header, Request
 # Internal
 from src.core.dependencies import BillingSvc, CurrentUserID
 from src.core.middleware.rate_limit import limiter
-from src.schemas.billing.requests import CreateCheckoutRequest, CreatePortalRequest
+from src.schemas.billing.requests import (
+    CancelSubscriptionRequest,
+    CreateCheckoutRequest,
+    CreatePortalRequest,
+    UpgradeSubscriptionRequest,
+)
 from src.schemas.billing.responses import CheckoutResponse, PortalResponse, SubscriptionResponse
 from src.schemas.common import MessageResponse
 
@@ -63,6 +68,34 @@ async def create_portal(
 ) -> PortalResponse:
     """Open the Stripe customer portal for billing management."""
     return await service.create_portal(org_id, user_id, return_url=str(body.return_url))
+
+
+@router.post("/orgs/{org_id}/billing/upgrade", response_model=MessageResponse, status_code=200)
+@limiter.limit("10/minute")
+async def upgrade_subscription(
+    request: Request,
+    org_id: uuid.UUID,
+    body: UpgradeSubscriptionRequest,
+    user_id: CurrentUserID,
+    service: BillingSvc,
+) -> MessageResponse:
+    """Upgrade an active subscription in-place to a higher plan."""
+    await service.upgrade_subscription(org_id, user_id, plan=body.plan, period=body.period)
+    return MessageResponse(message="Subscription upgraded")
+
+
+@router.post("/orgs/{org_id}/billing/cancel", response_model=MessageResponse, status_code=200)
+@limiter.limit("10/minute")
+async def cancel_subscription(
+    request: Request,
+    org_id: uuid.UUID,
+    body: CancelSubscriptionRequest,
+    user_id: CurrentUserID,
+    service: BillingSvc,
+) -> MessageResponse:
+    """Cancel the subscription at the end of the current billing period."""
+    await service.cancel_subscription(org_id, user_id, reason=body.reason)
+    return MessageResponse(message="Subscription will cancel at period end")
 
 
 @router.post("/billing/webhook", response_model=MessageResponse)

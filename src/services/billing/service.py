@@ -99,6 +99,36 @@ class StripeBillingService(BaseBillingService):
         )
         return session.url  # type: ignore[return-value]
 
+    async def modify_subscription(self, stripe_sub_id: str, price_id: str) -> None:
+        """Swap the price on an active subscription (immediate upgrade with proration).
+
+        Args:
+            stripe_sub_id (str): Stripe subscription ID to modify.
+            price_id (str): New Stripe price ID for the target plan/period.
+
+        """
+        raw_sub = await anyio.to_thread.run_sync(lambda: stripe.Subscription.retrieve(stripe_sub_id))
+        item_id: str = raw_sub["items"]["data"][0]["id"]
+        await anyio.to_thread.run_sync(
+            lambda: stripe.Subscription.modify(
+                stripe_sub_id,
+                items=[{"id": item_id, "price": price_id}],
+                # Charge the prorated difference immediately rather than crediting the next invoice
+                proration_behavior="always_invoice",
+            )
+        )
+
+    async def cancel_subscription(self, stripe_sub_id: str) -> None:
+        """Mark a subscription to cancel at the end of the current billing period.
+
+        Args:
+            stripe_sub_id (str): Stripe subscription ID to cancel.
+
+        """
+        await anyio.to_thread.run_sync(
+            lambda: stripe.Subscription.modify(stripe_sub_id, cancel_at_period_end=True)
+        )
+
     async def parse_webhook(self, payload: bytes, sig_header: str) -> dict:
         """Verify Stripe signature and return the parsed event dict.
 
@@ -219,6 +249,90 @@ class BillingOrchestrator:
         log.info("billing.checkout_created", org_id=str(org_id), plan=plan.value)
         return CheckoutResponse(checkout_url=checkout_url)
 
+    async def upgrade_subscription(
+        self,
+        org_id: uuid.UUID,
+        user_id: uuid.UUID,
+        plan: Plan,
+        period: BillingPeriod,
+    ) -> None:
+        """Upgrade an active subscription in-place without going through the portal.
+
+        Only valid when the org already has a Stripe subscription. Use create_checkout
+        for new subscribers. Downgrades must go through the portal.
+
+        Args:
+            org_id (uuid.UUID): The org's UUID.
+            user_id (uuid.UUID): The requesting user's UUID (must be admin/owner).
+            plan (Plan): Target plan — must be higher than the current plan.
+            period (BillingPeriod): Billing period for the new price.
+
+        Raises:
+            ForbiddenError: If the user is not an admin, or org has no active subscription.
+            NotFoundError: If the org does not exist.
+            ConflictError: If the org is already on the target plan, or no price ID configured.
+
+        """
+        org = await self.org_repo.get_by_id(org_id)
+        if not org:
+            raise NotFoundError("Organisation", org_id)
+        if not await self.membership_repo.user_has_role(user_id, org_id, Role.ADMIN):
+            raise ForbiddenError("Only admins can manage billing")
+
+        sub = await self.subscription_repo.get_by_org(org_id)
+        if not sub or not sub.stripe_subscription_id:
+            # No active paid sub — caller should use create_checkout instead
+            raise ForbiddenError("No active subscription to upgrade — use checkout to start one")
+
+        _PLAN_ORDER: dict[Plan, int] = {Plan.FREE: 0, Plan.PRO: 1, Plan.MAX: 2, Plan.ENTERPRISE: 3}
+        if _PLAN_ORDER.get(plan, 0) <= _PLAN_ORDER.get(sub.plan, 0):
+            # Same tier or downgrade — must go through the Stripe portal
+            raise ConflictError("Subscription", "plan", plan.value)
+
+        price_map = _build_price_map()
+        price_id = price_map.get((plan, period))
+        if not price_id:
+            raise ConflictError("Plan", "price_id", f"{plan.value}/{period.value}")
+
+        await self.billing_svc.modify_subscription(sub.stripe_subscription_id, price_id)
+        log.info("billing.subscription_upgraded", org_id=str(org_id), plan=plan.value)
+
+    async def cancel_subscription(
+        self,
+        org_id: uuid.UUID,
+        user_id: uuid.UUID,
+        reason: str | None,
+    ) -> None:
+        """Cancel the active subscription at period end and record the reason.
+
+        Args:
+            org_id (uuid.UUID): The org's UUID.
+            user_id (uuid.UUID): The requesting user's UUID (must be admin/owner).
+            reason (str | None): Optional cancellation reason from the in-app modal.
+
+        Raises:
+            ForbiddenError: If the user is not an admin, or org has no active subscription.
+            NotFoundError: If the org does not exist.
+
+        """
+        org = await self.org_repo.get_by_id(org_id)
+        if not org:
+            raise NotFoundError("Organisation", org_id)
+        if not await self.membership_repo.user_has_role(user_id, org_id, Role.ADMIN):
+            raise ForbiddenError("Only admins can manage billing")
+
+        sub = await self.subscription_repo.get_by_org(org_id)
+        if not sub or not sub.stripe_subscription_id:
+            raise ForbiddenError("No active subscription to cancel")
+
+        await self.billing_svc.cancel_subscription(sub.stripe_subscription_id)
+        await self.subscription_repo.update(
+            sub,
+            cancel_at_period_end=True,
+            cancellation_reason=reason,
+        )
+        log.info("billing.subscription_cancelled", org_id=str(org_id), reason=reason)
+
     async def create_portal(
         self,
         org_id: uuid.UUID,
@@ -314,7 +428,7 @@ class BillingOrchestrator:
         price_id: str = item["price"]["id"]
         plan = self._plan_from_price(price_id)
         period_end = datetime.fromtimestamp(
-            item["current_period_end"], tz=timezone.utc
+            stripe_sub["current_period_end"], tz=timezone.utc
         )
 
         await self.subscription_repo.update(
@@ -342,8 +456,11 @@ class BillingOrchestrator:
             status = SubscriptionStatus(status_str)
         except ValueError:
             status = SubscriptionStatus.ACTIVE
-        period_end = datetime.fromtimestamp(item["current_period_end"], tz=timezone.utc)
+        period_end = datetime.fromtimestamp(data["current_period_end"], tz=timezone.utc)
 
+        # cancellation_details.feedback is intentionally not read here — Stripe's built-in
+        # cancellation survey is disabled in favour of our own in-app modal, so this field
+        # will never be present. The reason is captured by POST /billing/cancel instead.
         await self.subscription_repo.update(
             sub,
             plan=plan,
