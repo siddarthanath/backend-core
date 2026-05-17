@@ -263,10 +263,10 @@ def make_stripe_subscription_dict(*, price_id: str = "price_pro_monthly", period
         "id": "sub_test123",
         "status": "active",
         "cancel_at_period_end": False,
+        "current_period_end": period_end,
         "items": {
             "data": [{
                 "price": {"id": price_id},
-                "current_period_end": period_end,
             }]
         },
     }
@@ -389,7 +389,8 @@ async def test_subscription_updated_changes_plan_and_status():
             "id": "sub_test123",
             "status": "active",
             "cancel_at_period_end": True,
-            "items": {"data": [{"price": {"id": "price_pro_monthly"}, "current_period_end": 9999999999}]},
+            "current_period_end": 9999999999,
+            "items": {"data": [{"price": {"id": "price_pro_monthly"}}]},
         }},
     }
 
