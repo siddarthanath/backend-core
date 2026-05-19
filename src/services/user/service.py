@@ -1,11 +1,11 @@
-"""UserService — profile lifecycle: create, read, update, soft-delete."""
+﻿"""UserService — profile lifecycle: create, read, update, soft-delete."""
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
 # Standard Library
 import uuid
 
-# Internal
+# Private Library
 from src.core.exceptions.types import NotFoundError
 from src.models.user import UserProfile
 from src.repositories.user import UserRepository
@@ -101,9 +101,9 @@ class UserService:
         before this method is invoked. Auth delete is handled by the caller (AuthService)
         after this returns.
 
-        Soft delete is used instead of hard delete so that if the Supabase auth delete
-        fails, the profile row still exists in a deleted state — no broken state. A
-        soft-deleted user's next login attempt returns None from get_by_id -> 401.
+        Soft delete is used instead of hard delete so that if this step fails after
+        Supabase auth has already been deleted, the orphaned profile row is harmless —
+        the user cannot log in (no auth record) and a periodic cleanup job can recover it.
 
         Production pattern: replace this with status=pending_deletion and enqueue a
         background job to hard-delete the row, cancel Stripe, purge storage, and remove
