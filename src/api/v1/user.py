@@ -19,7 +19,7 @@ from src.schemas.user.requests import (
     UpdatePasswordRequest,
     UpdateProfileRequest,
 )
-from src.schemas.user.responses import UserMeResponse, UserProfileResponse
+from src.schemas.user.responses import UserMeResponse
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
@@ -56,21 +56,32 @@ async def get_me(
     )
 
 
-@router.patch("/me", response_model=UserProfileResponse)
+@router.patch("/me", response_model=UserMeResponse)
 @limiter.limit("30/minute")
 async def update_profile(
     request: Request,
     body: UpdateProfileRequest,
-    user_id: CurrentUserID,
+    claims: CurrentUserClaims,
     service: UserSvc,
-) -> UserProfileResponse:
+    org_service: OrgSvc,
+) -> UserMeResponse:
     """Update the authenticated user's display name."""
+    user_id = uuid.UUID(claims.sub)
     user = await service.update_profile(
         user_id,
         first_name=body.first_name,
         last_name=body.last_name,
     )
-    return UserProfileResponse.model_validate(user)
+    org = await org_service.get_or_create_personal(user_id, email=claims.email)
+    return UserMeResponse(
+        id=user.id,
+        email=user.email,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        created_at=user.created_at,
+        org_count=1,
+        org_id=org.id,
+    )
 
 
 @router.post("/reset-password", response_model=MessageResponse)

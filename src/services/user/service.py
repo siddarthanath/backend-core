@@ -95,10 +95,19 @@ class UserService:
         return await self.repo.update(user, **updates)
 
     async def delete(self, user_id: uuid.UUID) -> None:
-        """Hard-delete the user profile. Memberships cascade at the DB level.
+        """Soft-delete the user profile so auth cleanup can safely fail and retry.
 
         Org cleanup (sole-owned orgs) must be performed by the caller (via OrgService)
-        before this method is invoked. Auth hard-delete is handled by the caller (AuthService).
+        before this method is invoked. Auth delete is handled by the caller (AuthService)
+        after this returns.
+
+        Soft delete is used instead of hard delete so that if the Supabase auth delete
+        fails, the profile row still exists in a deleted state — no broken state. A
+        soft-deleted user's next login attempt returns None from get_by_id -> 401.
+
+        Production pattern: replace this with status=pending_deletion and enqueue a
+        background job to hard-delete the row, cancel Stripe, purge storage, and remove
+        from email lists asynchronously with retries after a grace period.
 
         Args:
             user_id (uuid.UUID): The authenticated user's UUID.
@@ -108,4 +117,4 @@ class UserService:
 
         """
         user = await self.get_me(user_id)
-        await self.repo.hard_delete(user)
+        await self.repo.soft_delete(user)

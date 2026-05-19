@@ -107,7 +107,7 @@ async def test_delete_raises_not_found_when_no_profile() -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_delete_hard_deletes_profile() -> None:
+async def test_delete_soft_deletes_profile() -> None:
     f = make_service()
     user_id = uuid.uuid4()
     profile = make_profile(id=user_id)
@@ -115,7 +115,7 @@ async def test_delete_hard_deletes_profile() -> None:
 
     await f.service.delete(user_id)
 
-    f.repo.hard_delete.assert_awaited_once_with(profile)
+    f.repo.soft_delete.assert_awaited_once_with(profile)
 
 
 @pytest.mark.unit
@@ -130,4 +130,4 @@ async def test_delete_does_not_touch_orgs_or_memberships() -> None:
     await f.service.delete(user_id)
 
     # Only one repo method should have been called beyond get_by_id
-    assert f.repo.hard_delete.await_count == 1
+    assert f.repo.soft_delete.await_count == 1
