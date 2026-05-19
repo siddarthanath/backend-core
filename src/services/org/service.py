@@ -5,13 +5,17 @@
 # Standard Library
 import uuid
 
-# Internal
+# Third-Party Library 
+
+# Private Library
+from src.configs.settings import app_settings
 from src.constants import MembershipStatus, Role
 from src.core.exceptions.types import ConflictError, ForbiddenError, NotFoundError
 from src.models.org import Membership, Organisation
 from src.repositories.org import MembershipRepository, OrgRepository
 from src.repositories.user import UserRepository
 from src.schemas.org.responses import MemberResponse
+from src.services.email.service import EmailService
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
@@ -24,10 +28,12 @@ class OrgService:
         org_repo: OrgRepository,
         membership_repo: MembershipRepository,
         user_repo: UserRepository,
+        email_service: EmailService,
     ) -> None:
         self.org_repo = org_repo
         self.membership_repo = membership_repo
         self.user_repo = user_repo
+        self.email_service = email_service
 
     async def get_or_create_personal(self, user_id: uuid.UUID, email: str) -> Organisation:
         """Return the user's personal org, creating it on first call.
@@ -219,7 +225,11 @@ class OrgService:
         if existing:
             raise ConflictError("Membership", "user", email)
 
-        return await self.membership_repo.create(
+        org = await self.org_repo.get_by_id(org_id)
+        if not org:
+            raise NotFoundError("Organisation", org_id)
+
+        membership = await self.membership_repo.create(
             Membership(
                 user_id=invitee.id,
                 org_id=org_id,
@@ -228,6 +238,16 @@ class OrgService:
                 invited_by=inviter_id,
             )
         )
+        accept_url = f"{app_settings.FRONTEND_BASE_URL}/app/invite/accept?org_id={org_id}"
+        await self.email_service.send(
+            to=invitee.email,
+            subject=f"You've been invited to {org.name}",
+            html=(
+                f"<p>You have been invited to join <strong>{org.name}</strong>.</p>"
+                f"<p><a href='{accept_url}'>Accept invitation</a></p>"
+            ),
+        )
+        return membership
 
     async def accept_invite(self, org_id: uuid.UUID, user_id: uuid.UUID) -> Membership:
         """Accept a pending invite, setting membership status to ACTIVE.

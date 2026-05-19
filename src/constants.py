@@ -38,19 +38,3 @@ class SubscriptionStatus(StrEnum):
     PAST_DUE = "past_due"
     CANCELED = "canceled"
     INCOMPLETE = "incomplete"
-
-
-class JobStatus(StrEnum):
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCELED = "canceled"
-
-
-class MediaType(StrEnum):
-    IMAGE = "image"
-    VIDEO = "video"
-    AUDIO = "audio"
-    DOCUMENT = "document"
-    OTHER = "other"

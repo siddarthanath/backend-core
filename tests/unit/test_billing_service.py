@@ -57,6 +57,7 @@ def make_subscription(**kwargs):
     sub.stripe_subscription_id = kwargs.get("stripe_subscription_id", None)
     sub.current_period_end = kwargs.get("current_period_end", None)
     sub.cancel_at_period_end = kwargs.get("cancel_at_period_end", False)
+    sub.cancellation_reason = kwargs.get("cancellation_reason", None)
     return sub
 
 

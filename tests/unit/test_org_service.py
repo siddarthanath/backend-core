@@ -24,15 +24,18 @@ def make_service(
     org_repo=None,
     membership_repo=None,
     user_repo=None,
+    email_service=None,
 ):
     """Return an OrgService wired to mocked repositories."""
     org_repo = org_repo or AsyncMock(spec=OrgRepository)
     membership_repo = membership_repo or AsyncMock(spec=MembershipRepository)
     user_repo = user_repo or AsyncMock(spec=UserRepository)
+    email_service = email_service or AsyncMock()
     service = OrgService(
         org_repo=org_repo,
         membership_repo=membership_repo,
         user_repo=user_repo,
+        email_service=email_service,
     )
     return service, org_repo, membership_repo, user_repo
 

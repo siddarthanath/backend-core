@@ -24,6 +24,7 @@ from src.services.api_key.service import ApiKeyService
 from src.services.audit.service import AuditService
 from src.services.auth.service import AuthService
 from src.services.billing.service import BillingOrchestrator, StripeBillingService
+from src.services.email.service import EmailService
 from src.services.flag.service import FeatureFlagService
 from src.services.org.service import OrgService
 from src.services.user.service import UserService
@@ -79,6 +80,7 @@ def get_org_service(session: DBSession) -> OrgService:
         org_repo=OrgRepository(session),
         membership_repo=MembershipRepository(session),
         user_repo=UserRepository(session),
+        email_service=EmailService(),
     )
 
 

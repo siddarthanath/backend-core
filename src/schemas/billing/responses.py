@@ -28,6 +28,7 @@ class SubscriptionResponse(BaseModel):
     stripe_subscription_id: Optional[str]
     current_period_end: Optional[datetime]
     cancel_at_period_end: bool
+    cancellation_reason: Optional[str]
     created_at: datetime
 
 

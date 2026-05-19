@@ -1,11 +1,11 @@
-"""UserService — profile lifecycle: create, read, update, soft-delete."""
+﻿"""UserService — profile lifecycle: create, read, update, soft-delete."""
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
 # Standard Library
 import uuid
 
-# Internal
+# Private Library
 from src.core.exceptions.types import NotFoundError
 from src.models.user import UserProfile
 from src.repositories.user import UserRepository
@@ -95,10 +95,19 @@ class UserService:
         return await self.repo.update(user, **updates)
 
     async def delete(self, user_id: uuid.UUID) -> None:
-        """Hard-delete the user profile. Memberships cascade at the DB level.
+        """Soft-delete the user profile so auth cleanup can safely fail and retry.
 
         Org cleanup (sole-owned orgs) must be performed by the caller (via OrgService)
-        before this method is invoked. Auth hard-delete is handled by the caller (AuthService).
+        before this method is invoked. Auth delete is handled by the caller (AuthService)
+        after this returns.
+
+        Soft delete is used instead of hard delete so that if this step fails after
+        Supabase auth has already been deleted, the orphaned profile row is harmless —
+        the user cannot log in (no auth record) and a periodic cleanup job can recover it.
+
+        Production pattern: replace this with status=pending_deletion and enqueue a
+        background job to hard-delete the row, cancel Stripe, purge storage, and remove
+        from email lists asynchronously with retries after a grace period.
 
         Args:
             user_id (uuid.UUID): The authenticated user's UUID.
@@ -108,4 +117,4 @@ class UserService:
 
         """
         user = await self.get_me(user_id)
-        await self.repo.hard_delete(user)
+        await self.repo.soft_delete(user)

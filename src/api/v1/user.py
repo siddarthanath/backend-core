@@ -1,14 +1,14 @@
-"""User endpoints — profile management and account operations."""
+﻿"""User endpoints — profile management and account operations."""
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
 # Standard Library
 import uuid
 
-# Third Party
+# Third-Party Library
 from fastapi import APIRouter, Request
 
-# Internal
+# Private Library
 from src.core.dependencies import AuthSvc, CurrentUserClaims, CurrentUserID, OrgSvc, UserSvc
 from src.core.middleware.rate_limit import limiter
 from src.schemas.common import MessageResponse
@@ -19,7 +19,7 @@ from src.schemas.user.requests import (
     UpdatePasswordRequest,
     UpdateProfileRequest,
 )
-from src.schemas.user.responses import UserMeResponse, UserProfileResponse
+from src.schemas.user.responses import UserMeResponse
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
@@ -56,21 +56,32 @@ async def get_me(
     )
 
 
-@router.patch("/me", response_model=UserProfileResponse)
+@router.patch("/me", response_model=UserMeResponse)
 @limiter.limit("30/minute")
 async def update_profile(
     request: Request,
     body: UpdateProfileRequest,
-    user_id: CurrentUserID,
+    claims: CurrentUserClaims,
     service: UserSvc,
-) -> UserProfileResponse:
+    org_service: OrgSvc,
+) -> UserMeResponse:
     """Update the authenticated user's display name."""
+    user_id = uuid.UUID(claims.sub)
     user = await service.update_profile(
         user_id,
         first_name=body.first_name,
         last_name=body.last_name,
     )
-    return UserProfileResponse.model_validate(user)
+    org = await org_service.get_or_create_personal(user_id, email=claims.email)
+    return UserMeResponse(
+        id=user.id,
+        email=user.email,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        created_at=user.created_at,
+        org_count=1,
+        org_id=org.id,
+    )
 
 
 @router.post("/reset-password", response_model=MessageResponse)
@@ -127,21 +138,28 @@ async def delete_account(
     org_service: OrgSvc,
     auth_service: AuthSvc,
 ) -> MessageResponse:
-    """Hard-delete the user's profile and auth record.
+    """Soft-delete the user's profile and revoke their Supabase auth record.
 
-    Order: clean up sole-owned orgs (OrgService) → delete profile (UserService) →
-    delete Supabase auth user (AuthService). DB CASCADE handles memberships/subscriptions.
+    Order: delete Supabase auth (AuthService) → clean up sole-owned orgs (OrgService)
+    → soft-delete profile (UserService).
+
+    Auth is deleted first so that failure at any later step leaves no broken state:
+    - If auth delete fails: nothing changed, user still has full access.
+    - If org cleanup or profile soft-delete fails after auth delete: user cannot log in
+      (auth record is gone), and the orphaned profile row is cleaned up by a periodic
+      maintenance job (find profiles where deleted_at IS NULL but no Supabase auth user
+      exists and soft-delete them). No manual intervention needed.
 
     body.confirmation must equal "DELETE MY ACCOUNT".
 
+    Production pattern: replace this with status=pending_deletion and enqueue a
+    background job to hard-delete the row, cancel Stripe, purge storage, and remove
+    from email lists asynchronously with retries after a grace period.
+
     """
+    await auth_service.delete_user(user_id)
     await org_service.cleanup_for_deleted_user(user_id)
     await service.delete(user_id)
-    # Auth delete runs last. If this fails after profile is already hard-deleted,
-    # the Supabase auth record lingers but the DB row is gone — user is locked out
-    # on next login. No automatic recovery; requires manual Supabase admin cleanup.
-    # Acceptable risk for a template; wrap in a retry/dead-letter queue for production.
-    await auth_service.delete_user(user_id)
     return MessageResponse(
         message="Account deleted.",
         detail="All your data has been permanently removed.",

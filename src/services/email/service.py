@@ -11,7 +11,7 @@ import urllib.request
 import anyio
 
 # Internal
-from src.configs.settings import get_settings
+from src.configs.settings import external_settings
 from src.utils.logging import get_logger
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
@@ -30,9 +30,8 @@ class EmailService:
     _RESEND_URL = "https://api.resend.com/emails"
 
     def __init__(self) -> None:
-        settings = get_settings().external
-        self._api_key = settings.RESEND_API_KEY
-        self._from_address = settings.EMAIL_FROM
+        self._api_key = external_settings.RESEND_API_KEY
+        self._from_address = external_settings.EMAIL_FROM
 
     async def send(self, *, to: str, subject: str, html: str) -> None:
         """Send a transactional email.
