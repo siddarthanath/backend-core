@@ -8,6 +8,7 @@ import uuid
 # Third-Party Library 
 
 # Private Library
+from src.configs.settings import app_settings
 from src.constants import MembershipStatus, Role
 from src.core.exceptions.types import ConflictError, ForbiddenError, NotFoundError
 from src.models.org import Membership, Organisation
@@ -225,6 +226,9 @@ class OrgService:
             raise ConflictError("Membership", "user", email)
 
         org = await self.org_repo.get_by_id(org_id)
+        if not org:
+            raise NotFoundError("Organisation", org_id)
+
         membership = await self.membership_repo.create(
             Membership(
                 user_id=invitee.id,
@@ -234,13 +238,13 @@ class OrgService:
                 invited_by=inviter_id,
             )
         )
-        org_name = org.name if org else str(org_id)
+        accept_url = f"{app_settings.FRONTEND_BASE_URL}/app/invite/accept?org_id={org_id}"
         await self.email_service.send(
             to=invitee.email,
-            subject=f"You've been invited to {org_name}",
+            subject=f"You've been invited to {org.name}",
             html=(
-                f"<p>You have been invited to join <strong>{org_name}</strong>.</p>"
-                f"<p><a href='/app/invite/accept?org_id={org_id}'>Accept invitation</a></p>"
+                f"<p>You have been invited to join <strong>{org.name}</strong>.</p>"
+                f"<p><a href='{accept_url}'>Accept invitation</a></p>"
             ),
         )
         return membership
