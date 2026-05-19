@@ -31,16 +31,6 @@ class UserRepository(BaseRepository[UserProfile]):
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_by_stripe_customer_id(self, customer_id: str) -> UserProfile | None:
-        """Fetch a user by Stripe customer ID — used during webhook processing."""
-        stmt = (
-            select(UserProfile)
-            .where(UserProfile.stripe_customer_id == customer_id)
-            .where(self._not_deleted())
-        )
-        result = await self.session.execute(stmt)
-        return result.scalar_one_or_none()
-
     async def upsert_from_supabase(
         self,
         *,
