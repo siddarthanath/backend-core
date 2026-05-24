@@ -7,7 +7,6 @@ import hashlib
 import secrets
 import uuid
 from datetime import datetime
-from typing import Optional
 
 # Private Library
 from src.constants import Role
@@ -59,7 +58,7 @@ class ApiKeyService:
         org_id: uuid.UUID,
         user_id: uuid.UUID,
         name: str,
-        expires_at: Optional[datetime] = None,
+        expires_at: datetime | None = None,
     ) -> ApiKeyCreatedResponse:
         """Create a new API key and return the raw key once.
 
@@ -136,7 +135,7 @@ class ApiKeyService:
         await self.repo.soft_delete(key)
         log.info("api_key.revoked", org_id=str(org_id), key_id=str(key_id))
 
-    async def verify(self, raw_key: str) -> Optional[ApiKey]:
+    async def verify(self, raw_key: str) -> ApiKey | None:
         """Look up a key by its raw value for request authentication.
 
         Args:

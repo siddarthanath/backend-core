@@ -21,3 +21,4 @@ class AppSettings(BaseSettings):
     FRONTEND_BASE_URL: str = "http://localhost:3000"
     REQUEST_TIMEOUT_SECONDS: int = 30
     RATE_LIMIT_DEFAULT: str = "60/minute"
+    MAX_BODY_SIZE_MB: int = 1
