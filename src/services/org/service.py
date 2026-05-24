@@ -5,7 +5,7 @@
 # Standard Library
 import uuid
 
-# Third-Party Library 
+# Third-Party Library
 
 # Private Library
 from src.configs.settings import app_settings

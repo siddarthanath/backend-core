@@ -1,14 +1,14 @@
-"""Audit log endpoints — read-only access to org audit events."""
+﻿"""Audit log endpoints — read-only access to org audit events."""
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
 # Standard Library
 import uuid
 
-# Third Party
+# Third-Party Library
 from fastapi import APIRouter, Query, Request
 
-# Internal
+# Private Library
 from src.core.dependencies import AuditSvc, CurrentUserID
 from src.core.middleware.rate_limit import limiter
 from src.schemas.audit.responses import AuditLogListResponse
@@ -25,7 +25,7 @@ async def list_audit_events(
     org_id: uuid.UUID,
     user_id: CurrentUserID,
     service: AuditSvc,
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=20, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> AuditLogListResponse:
     """Return paginated audit events for an org. Requires admin or owner role."""
