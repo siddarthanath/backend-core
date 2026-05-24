@@ -1,4 +1,4 @@
-﻿"""Audit log endpoints — read-only access to org audit events."""
+"""Audit log endpoints — read-only access to org audit events."""
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
