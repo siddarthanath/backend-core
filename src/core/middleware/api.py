@@ -48,6 +48,7 @@ class APILoggingMiddleware(BaseHTTPMiddleware):
                 async def receive() -> dict[str, object]:
                     return {"type": "http.request", "body": request_body, "more_body": False}
 
+                # NOTE: _receive is an internal Starlette attribute — check after Starlette upgrades.
                 request._receive = receive  # type: ignore[method-assign]
             except Exception:  # Body logging is best-effort; never block the request
                 log.exception("request.body_logging_failed")

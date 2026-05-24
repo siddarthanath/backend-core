@@ -24,7 +24,11 @@ log = get_logger(__name__)
 
 
 class AuthService:
-    """Wraps Supabase Admin SDK. Sync SDK calls are offloaded to a thread via anyio."""
+    """Wraps Supabase Admin SDK. Sync SDK calls are offloaded to a thread via anyio.
+
+    NOTE: These methods cannot be covered by automated integration tests without a live
+    Supabase project. Test them manually after changing Supabase SDK versions.
+    """
 
     async def delete_user(self, user_id: uuid.UUID) -> None:
         """Hard-delete the user from Supabase auth. Call after soft-deleting UserProfile.

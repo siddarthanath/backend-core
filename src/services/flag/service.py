@@ -54,6 +54,8 @@ class FeatureFlagService:
         flags = await self.repo.get_by_org(org_id)
         return [FeatureFlagResponse.model_validate(f) for f in flags]
 
+    # NOTE: evaluate() is intentionally not exposed as a REST endpoint.
+    # The product layer calls it directly via dependency injection.
     async def evaluate(
         self, org_id: uuid.UUID, user_id: uuid.UUID, key: str
     ) -> bool:
