@@ -4,7 +4,6 @@
 
 # Standard Library
 import uuid
-from typing import Optional
 
 # Private Library
 from src.core.exceptions.types import ForbiddenError, NotFoundError
@@ -37,9 +36,9 @@ class AuditService:
         org_id: uuid.UUID,
         action: str,
         resource_type: str,
-        actor_id: Optional[uuid.UUID] = None,
-        resource_id: Optional[str] = None,
-        metadata: Optional[dict[str, object]] = None,
+        actor_id: uuid.UUID | None = None,
+        resource_id: str | None = None,
+        metadata: dict[str, object] | None = None,
     ) -> AuditLogResponse:
         """Append an audit event for an org.
 

@@ -41,7 +41,7 @@ class AuthService:
             await anyio.to_thread.run_sync(
                 lambda: client.auth.admin.delete_user(str(user_id))
             )
-        except Exception as e:
+        except Exception as e:  # Supabase SDK can raise any exception type; catch-all is intentional
             log.error("supabase_delete_user_failed", user_id=str(user_id), error=str(e))
             raise ExternalServiceError("Supabase", str(e))
 
@@ -60,7 +60,7 @@ class AuthService:
             await anyio.to_thread.run_sync(
                 lambda: client.auth.admin.generate_link({"type": "recovery", "email": email})
             )
-        except Exception as e:
+        except Exception as e:  # Supabase SDK can raise any exception type; catch-all is intentional
             log.error("supabase_password_reset_failed", error=str(e))
             raise ExternalServiceError("Supabase", str(e))
 
@@ -80,7 +80,7 @@ class AuthService:
             await anyio.to_thread.run_sync(
                 lambda: client.auth.admin.update_user_by_id(str(user_id), {"email": new_email})
             )
-        except Exception as e:
+        except Exception as e:  # Supabase SDK can raise any exception type; catch-all is intentional
             log.error("supabase_update_email_failed", user_id=str(user_id), error=str(e))
             raise ExternalServiceError("Supabase", str(e))
 
@@ -100,6 +100,6 @@ class AuthService:
             await anyio.to_thread.run_sync(
                 lambda: client.auth.admin.update_user_by_id(str(user_id), {"password": new_password})
             )
-        except Exception as e:
+        except Exception as e:  # Supabase SDK can raise any exception type; catch-all is intentional
             log.error("supabase_update_password_failed", user_id=str(user_id), error=str(e))
             raise ExternalServiceError("Supabase", str(e))

@@ -89,6 +89,7 @@ async def update_profile(
 
 @router.post("/reset-password", response_model=MessageResponse)
 @limiter.limit("5/minute")
+# Intentionally unauthenticated — caller doesn't have a token yet (forgot password flow)
 async def request_password_reset(
     request: Request,
     body: RequestPasswordResetRequest,

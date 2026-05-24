@@ -49,7 +49,7 @@ class APILoggingMiddleware(BaseHTTPMiddleware):
                     return {"type": "http.request", "body": request_body, "more_body": False}
 
                 request._receive = receive  # type: ignore[method-assign]
-            except Exception:
+            except Exception:  # Body logging is best-effort; never block the request
                 log.exception("request.body_logging_failed")
 
         response = await call_next(request)  # type: ignore[misc]
@@ -79,6 +79,6 @@ class APILoggingMiddleware(BaseHTTPMiddleware):
                 headers=dict(response.headers),
                 media_type=response.media_type,
             )
-        except Exception:
+        except Exception:  # Body logging is best-effort; serve the plain response on failure
             log.exception("response.body_logging_failed")
             return response

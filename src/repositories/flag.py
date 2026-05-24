@@ -4,7 +4,6 @@
 
 # Standard Library
 import uuid
-from typing import Optional
 
 # Third-Party Library
 from sqlalchemy import select
@@ -34,14 +33,13 @@ class FlagRepository(BaseRepository[FeatureFlag]):
         stmt = (
             select(FeatureFlag)
             .where(FeatureFlag.org_id == org_id)
+            .where(self._not_deleted())
             .order_by(FeatureFlag.key)
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_by_org_and_key(
-        self, org_id: uuid.UUID, key: str
-    ) -> Optional[FeatureFlag]:
+    async def get_by_org_and_key(self, org_id: uuid.UUID, key: str) -> FeatureFlag | None:
         """Return a single flag by org and key.
 
         Args:
@@ -56,6 +54,7 @@ class FlagRepository(BaseRepository[FeatureFlag]):
             select(FeatureFlag)
             .where(FeatureFlag.org_id == org_id)
             .where(FeatureFlag.key == key)
+            .where(self._not_deleted())
         )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()

@@ -4,7 +4,6 @@
 
 # Standard Library
 import uuid
-from typing import Optional
 
 # Third-Party Library
 from sqlalchemy import select
@@ -42,7 +41,7 @@ class ApiKeyRepository(BaseRepository[ApiKey]):
 
     async def get_by_id_and_org(
         self, key_id: uuid.UUID, org_id: uuid.UUID
-    ) -> Optional[ApiKey]:
+    ) -> ApiKey | None:
         """Return an active API key by id scoped to an org.
 
         Args:
@@ -62,7 +61,7 @@ class ApiKeyRepository(BaseRepository[ApiKey]):
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_by_hash(self, key_hash: str) -> Optional[ApiKey]:
+    async def get_by_hash(self, key_hash: str) -> ApiKey | None:
         """Return an active API key by its sha256 hash.
 
         Args:

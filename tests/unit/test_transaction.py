@@ -14,6 +14,7 @@ from src.services.sessions.database import transaction
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
 
+@pytest.mark.unit
 @pytest.mark.asyncio
 async def test_transaction_commits_on_success() -> None:
     """transaction() commits then closes the session when the block succeeds."""
@@ -27,6 +28,7 @@ async def test_transaction_commits_on_success() -> None:
     session.close.assert_awaited_once()
 
 
+@pytest.mark.unit
 @pytest.mark.asyncio
 async def test_transaction_rolls_back_on_exception() -> None:
     """transaction() rolls back, closes the session, and re-raises on exception."""
@@ -42,6 +44,7 @@ async def test_transaction_rolls_back_on_exception() -> None:
     session.close.assert_awaited_once()
 
 
+@pytest.mark.unit
 @pytest.mark.asyncio
 async def test_transaction_closes_session_after_rollback() -> None:
     """transaction() always closes the session — even when rollback itself raises."""

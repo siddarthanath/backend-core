@@ -39,7 +39,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         start = time.perf_counter()
         try:
             response = await call_next(request)
-        except Exception:
+        except Exception:  # Catch-log-reraise: we want the request_id in the exception log before it propagates
             duration_ms = round(
                 (time.perf_counter() - start) * 1000,
                 1,
