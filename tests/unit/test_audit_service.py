@@ -40,72 +40,76 @@ def make_log(**kwargs):
     return entry
 
 
-@pytest.mark.asyncio
-async def test_log_event_persists_and_returns_response():
-    svc, repo, _, _ = make_service()
-    org_id = uuid.uuid4()
-    actor_id = uuid.uuid4()
-    stored = make_log(org_id=org_id, actor_id=actor_id, action="member.invited", resource_type="member")
-    repo.create.return_value = stored
+class TestLogEvent:
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_persists_and_returns_response(self) -> None:
+        svc, repo, _, _ = make_service()
+        org_id = uuid.uuid4()
+        actor_id = uuid.uuid4()
+        stored = make_log(org_id=org_id, actor_id=actor_id, action="member.invited", resource_type="member")
+        repo.create.return_value = stored
 
-    result = await svc.log_event(
-        org_id=org_id,
-        action="member.invited",
-        resource_type="member",
-        actor_id=actor_id,
-        resource_id="abc123",
-        metadata={"email": "x@y.com"},
-    )
+        result = await svc.log_event(
+            org_id=org_id,
+            action="member.invited",
+            resource_type="member",
+            actor_id=actor_id,
+            resource_id="abc123",
+            metadata={"email": "x@y.com"},
+        )
 
-    repo.create.assert_called_once()
-    assert result.org_id == org_id
-    assert result.actor_id == actor_id
-    assert result.action == "member.invited"
+        repo.create.assert_called_once()
+        assert result.org_id == org_id
+        assert result.actor_id == actor_id
+        assert result.action == "member.invited"
 
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_allows_null_actor_for_system_events(self) -> None:
+        svc, repo, _, _ = make_service()
+        stored = make_log(actor_id=None, action="system.cleanup")
+        repo.create.return_value = stored
 
-@pytest.mark.asyncio
-async def test_log_event_allows_null_actor_for_system_events():
-    svc, repo, _, _ = make_service()
-    stored = make_log(actor_id=None, action="system.cleanup")
-    repo.create.return_value = stored
-
-    result = await svc.log_event(org_id=uuid.uuid4(), action="system.cleanup", resource_type="system")
-    assert result.actor_id is None
-
-
-@pytest.mark.asyncio
-async def test_get_events_returns_paginated_list():
-    svc, repo, org_repo, membership_repo = make_service()
-    org_id = uuid.uuid4()
-    user_id = uuid.uuid4()
-    org_repo.get_by_id.return_value = MagicMock(id=org_id)
-    membership_repo.user_has_role.return_value = True
-    logs = [make_log(org_id=org_id), make_log(org_id=org_id)]
-    repo.get_by_org.return_value = logs
-    repo.count_by_org.return_value = 2
-
-    result = await svc.get_events(org_id, user_id, limit=10, offset=0)
-
-    assert result.total == 2
-    assert len(result.items) == 2
-    assert result.limit == 10
-    assert result.offset == 0
+        result = await svc.log_event(org_id=uuid.uuid4(), action="system.cleanup", resource_type="system")
+        assert result.actor_id is None
 
 
-@pytest.mark.asyncio
-async def test_get_events_raises_not_found_for_unknown_org():
-    svc, _, org_repo, _ = make_service()
-    org_repo.get_by_id.return_value = None
+class TestGetEvents:
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_returns_paginated_list(self) -> None:
+        svc, repo, org_repo, membership_repo = make_service()
+        org_id = uuid.uuid4()
+        user_id = uuid.uuid4()
+        org_repo.get_by_id.return_value = MagicMock(id=org_id)
+        membership_repo.user_has_role.return_value = True
+        logs = [make_log(org_id=org_id), make_log(org_id=org_id)]
+        repo.get_by_org.return_value = logs
+        repo.count_by_org.return_value = 2
 
-    with pytest.raises(NotFoundError):
-        await svc.get_events(uuid.uuid4(), uuid.uuid4())
+        result = await svc.get_events(org_id, user_id, limit=10, offset=0)
 
+        assert result.total == 2
+        assert len(result.items) == 2
+        assert result.limit == 10
+        assert result.offset == 0
 
-@pytest.mark.asyncio
-async def test_get_events_raises_forbidden_for_non_admin():
-    svc, _, org_repo, membership_repo = make_service()
-    org_repo.get_by_id.return_value = MagicMock()
-    membership_repo.user_has_role.return_value = False
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_raises_not_found_for_unknown_org(self) -> None:
+        svc, _, org_repo, _ = make_service()
+        org_repo.get_by_id.return_value = None
 
-    with pytest.raises(ForbiddenError):
-        await svc.get_events(uuid.uuid4(), uuid.uuid4())
+        with pytest.raises(NotFoundError):
+            await svc.get_events(uuid.uuid4(), uuid.uuid4())
+
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_raises_forbidden_for_non_admin(self) -> None:
+        svc, _, org_repo, membership_repo = make_service()
+        org_repo.get_by_id.return_value = MagicMock()
+        membership_repo.user_has_role.return_value = False
+
+        with pytest.raises(ForbiddenError):
+            await svc.get_events(uuid.uuid4(), uuid.uuid4())
