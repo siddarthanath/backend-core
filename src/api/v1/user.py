@@ -44,15 +44,17 @@ async def get_me(
     """
     user_id = uuid.UUID(claims.sub)
     user = await service.get_or_create(user_id, email=claims.email, full_name=claims.full_name)
-    org = await org_service.get_or_create_personal(user_id, email=claims.email)
+    await org_service.get_or_create_personal(user_id, email=claims.email)
+    orgs = await org_service.list_my_orgs(user_id)
+    personal_org = next((o for o in orgs if o.is_personal), None)
     return UserMeResponse(
         id=user.id,
         email=user.email,
         first_name=user.first_name,
         last_name=user.last_name,
         created_at=user.created_at,
-        org_count=1,
-        org_id=org.id,
+        org_count=len(orgs),
+        org_id=personal_org.id if personal_org else None,
     )
 
 
@@ -72,15 +74,16 @@ async def update_profile(
         first_name=body.first_name,
         last_name=body.last_name,
     )
-    org = await org_service.get_or_create_personal(user_id, email=claims.email)
+    orgs = await org_service.list_my_orgs(user_id)
+    personal_org = next((o for o in orgs if o.is_personal), None)
     return UserMeResponse(
         id=user.id,
         email=user.email,
         first_name=user.first_name,
         last_name=user.last_name,
         created_at=user.created_at,
-        org_count=1,
-        org_id=org.id,
+        org_count=len(orgs),
+        org_id=personal_org.id if personal_org else None,
     )
 
 

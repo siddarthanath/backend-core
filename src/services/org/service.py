@@ -5,7 +5,7 @@
 # Standard Library
 import uuid
 
-# Third-Party Library 
+# Third-Party Library
 
 # Private Library
 from src.configs.settings import app_settings
@@ -16,8 +16,11 @@ from src.repositories.org import MembershipRepository, OrgRepository
 from src.repositories.user import UserRepository
 from src.schemas.org.responses import MemberResponse
 from src.services.email.service import EmailService
+from src.utils.logging import get_logger
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
+
+log = get_logger(__name__)
 
 
 class OrgService:
@@ -239,14 +242,19 @@ class OrgService:
             )
         )
         accept_url = f"{app_settings.FRONTEND_BASE_URL}/app/invite/accept?org_id={org_id}"
-        await self.email_service.send(
-            to=invitee.email,
-            subject=f"You've been invited to {org.name}",
-            html=(
-                f"<p>You have been invited to join <strong>{org.name}</strong>.</p>"
-                f"<p><a href='{accept_url}'>Accept invitation</a></p>"
-            ),
-        )
+        try:
+            await self.email_service.send(
+                to=invitee.email,
+                subject=f"You've been invited to {org.name}",
+                html=(
+                    f"<p>You have been invited to join <strong>{org.name}</strong>.</p>"
+                    f"<p><a href='{accept_url}'>Accept invitation</a></p>"
+                ),
+            )
+        except Exception:
+            # Delivery failure does not roll back the membership row — the invite is valid.
+            # The admin can re-send via a future resend-invite endpoint.
+            log.warning("invite.email_failed", org_id=str(org_id), invitee=invitee.email)
         return membership
 
     async def accept_invite(self, org_id: uuid.UUID, user_id: uuid.UUID) -> Membership:
