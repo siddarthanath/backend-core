@@ -36,5 +36,7 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
             )
         except asyncio.TimeoutError:
             log.warning("request.timeout", method=request.method, path=request.url.path)
-            envelope = ErrorEnvelope.from_exception(code="TIMEOUT", message="Request timed out")
+            envelope = ErrorEnvelope.from_exception(
+                code="TIMEOUT", message="Request timed out"
+            )
             return JSONResponse(status_code=504, content=envelope.model_dump())

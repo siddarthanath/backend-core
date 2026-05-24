@@ -34,8 +34,18 @@ class Subscription(UUIDMixin, TimestampMixin, SQLModel, table=True):
         index=True,
         nullable=False,
     )
-    plan: Plan = Field(default=Plan.FREE, nullable=False, sa_type=sa.Enum(Plan, name="plan", create_type=True))
-    status: SubscriptionStatus = Field(default=SubscriptionStatus.ACTIVE, nullable=False, sa_type=sa.Enum(SubscriptionStatus, name="subscriptionstatus", create_type=True))
+    plan: Plan = Field(
+        default=Plan.FREE,
+        nullable=False,
+        sa_type=sa.Enum(Plan, name="plan", create_type=True),
+    )
+    status: SubscriptionStatus = Field(
+        default=SubscriptionStatus.ACTIVE,
+        nullable=False,
+        sa_type=sa.Enum(
+            SubscriptionStatus, name="subscriptionstatus", create_type=True
+        ),
+    )
     stripe_subscription_id: Optional[str] = Field(
         default=None,
         unique=True,

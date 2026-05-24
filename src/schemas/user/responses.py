@@ -10,7 +10,6 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 # Private Library
-from src.constants import Plan
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 

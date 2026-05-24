@@ -7,7 +7,12 @@ from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 # Third-Party Library
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 # Private Library
 from src.configs.settings import database_settings
@@ -75,7 +80,9 @@ class DatabaseSession:
 
         """
         if self._session_factory is None:
-            raise RuntimeError("DatabaseSession not initialised. Call initialise() first.")
+            raise RuntimeError(
+                "DatabaseSession not initialised. Call initialise() first."
+            )
         return self._session_factory()
 
 

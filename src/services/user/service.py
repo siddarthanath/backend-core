@@ -11,7 +11,6 @@ from src.models.user import UserProfile
 from src.repositories.user import UserRepository
 
 
-
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
 

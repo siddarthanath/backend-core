@@ -25,6 +25,7 @@ SENSITIVE_KEYS = {
     "set-cookie",
 }
 
+
 def _truncate(value: str, limit: int = MAX_BODY_LOG_BYTES) -> str:
     """Truncate oversized payloads safely."""
     if len(value) <= limit:
@@ -32,15 +33,12 @@ def _truncate(value: str, limit: int = MAX_BODY_LOG_BYTES) -> str:
 
     return f"{value[:limit]}... [TRUNCATED]"
 
+
 def _redact(data: object) -> object:
     """Recursively redact sensitive fields."""
     if isinstance(data, dict):
         return {
-            key: (
-                "***REDACTED***"
-                if key.lower() in SENSITIVE_KEYS
-                else _redact(value)
-            )
+            key: ("***REDACTED***" if key.lower() in SENSITIVE_KEYS else _redact(value))
             for key, value in data.items()
         }
 
@@ -48,6 +46,7 @@ def _redact(data: object) -> object:
         return [_redact(item) for item in data]
 
     return data
+
 
 def _decode_body(body: bytes) -> object:
     """Decode request/response body safely."""

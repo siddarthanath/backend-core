@@ -28,7 +28,9 @@ async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     db_session = DatabaseSession()
     db_session.initialise()
     db_registry.register(db_session, name="default")
-    log.info("app.started", name=app_settings.APP_NAME, version=app_settings.APP_VERSION)
+    log.info(
+        "app.started", name=app_settings.APP_NAME, version=app_settings.APP_VERSION
+    )
 
     yield
 

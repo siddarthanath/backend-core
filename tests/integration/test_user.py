@@ -84,9 +84,13 @@ async def test_update_profile_partial_update_leaves_other_fields(
     db_session: AsyncSession,
 ) -> None:
     await authed_client.get("/api/v1/user/me")
-    await authed_client.patch("/api/v1/user/me", json={"first_name": "Ada", "last_name": "Lovelace"})
+    await authed_client.patch(
+        "/api/v1/user/me", json={"first_name": "Ada", "last_name": "Lovelace"}
+    )
 
-    response = await authed_client.patch("/api/v1/user/me", json={"first_name": "Grace"})
+    response = await authed_client.patch(
+        "/api/v1/user/me", json={"first_name": "Grace"}
+    )
 
     assert response.status_code == 200
     data = response.json()

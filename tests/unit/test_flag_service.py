@@ -22,7 +22,14 @@ def make_service(*, repo=None, org_repo=None, membership_repo=None):
     repo = repo or AsyncMock(spec=FlagRepository)
     org_repo = org_repo or AsyncMock(spec=OrgRepository)
     membership_repo = membership_repo or AsyncMock(spec=MembershipRepository)
-    return FeatureFlagService(repo=repo, org_repo=org_repo, membership_repo=membership_repo), repo, org_repo, membership_repo
+    return (
+        FeatureFlagService(
+            repo=repo, org_repo=org_repo, membership_repo=membership_repo
+        ),
+        repo,
+        org_repo,
+        membership_repo,
+    )
 
 
 def make_flag(**kwargs):
@@ -49,7 +56,10 @@ class TestGetFlags:
         svc, repo, org_repo, membership_repo = make_service()
         org_id = uuid.uuid4()
         _with_member_access(org_repo, membership_repo, org_id)
-        flags = [make_flag(org_id=org_id, key="flag_a"), make_flag(org_id=org_id, key="flag_b")]
+        flags = [
+            make_flag(org_id=org_id, key="flag_a"),
+            make_flag(org_id=org_id, key="flag_b"),
+        ]
         repo.get_by_org.return_value = flags
 
         result = await svc.get_flags(org_id, uuid.uuid4())
@@ -130,7 +140,9 @@ class TestUpsert:
         updated = make_flag(org_id=org_id, key="existing_flag", enabled=True)
         repo.update.return_value = updated
 
-        result = await svc.upsert(org_id, uuid.uuid4(), key="existing_flag", enabled=True)
+        result = await svc.upsert(
+            org_id, uuid.uuid4(), key="existing_flag", enabled=True
+        )
         repo.update.assert_called_once()
         repo.create.assert_not_called()
         assert result.enabled is True

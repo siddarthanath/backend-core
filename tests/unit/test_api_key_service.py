@@ -24,7 +24,12 @@ def make_service(*, repo=None, org_repo=None, membership_repo=None):
     repo = repo or AsyncMock(spec=ApiKeyRepository)
     org_repo = org_repo or AsyncMock(spec=OrgRepository)
     membership_repo = membership_repo or AsyncMock(spec=MembershipRepository)
-    return ApiKeyService(repo=repo, org_repo=org_repo, membership_repo=membership_repo), repo, org_repo, membership_repo
+    return (
+        ApiKeyService(repo=repo, org_repo=org_repo, membership_repo=membership_repo),
+        repo,
+        org_repo,
+        membership_repo,
+    )
 
 
 def make_key(**kwargs):
@@ -105,7 +110,10 @@ class TestListKeys:
         svc, repo, org_repo, membership_repo = make_service()
         org_id = uuid.uuid4()
         _with_admin_access(org_repo, membership_repo, org_id)
-        repo.get_by_org.return_value = [make_key(org_id=org_id), make_key(org_id=org_id)]
+        repo.get_by_org.return_value = [
+            make_key(org_id=org_id),
+            make_key(org_id=org_id),
+        ]
 
         result = await svc.list_keys(org_id, uuid.uuid4())
 

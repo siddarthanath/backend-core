@@ -34,7 +34,11 @@ def configure_logging(*, debug: bool = False) -> None:
     processors: list[Processor] = (
         [*shared, structlog.dev.ConsoleRenderer()]
         if debug
-        else [*shared, structlog.processors.format_exc_info, structlog.processors.JSONRenderer()]
+        else [
+            *shared,
+            structlog.processors.format_exc_info,
+            structlog.processors.JSONRenderer(),
+        ]
     )
 
     structlog.configure(

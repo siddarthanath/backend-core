@@ -17,7 +17,11 @@ from src.schemas.billing.requests import (
     CreatePortalRequest,
     UpgradeSubscriptionRequest,
 )
-from src.schemas.billing.responses import CheckoutResponse, PortalResponse, SubscriptionResponse
+from src.schemas.billing.responses import (
+    CheckoutResponse,
+    PortalResponse,
+    SubscriptionResponse,
+)
 from src.schemas.common import MessageResponse
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
@@ -37,7 +41,9 @@ async def get_subscription(
     return await service.get_subscription(org_id, user_id)
 
 
-@router.post("/orgs/{org_id}/billing/checkout", response_model=CheckoutResponse, status_code=201)
+@router.post(
+    "/orgs/{org_id}/billing/checkout", response_model=CheckoutResponse, status_code=201
+)
 @limiter.limit("10/minute")
 async def create_checkout(
     request: Request,
@@ -57,7 +63,9 @@ async def create_checkout(
     )
 
 
-@router.post("/orgs/{org_id}/billing/portal", response_model=PortalResponse, status_code=201)
+@router.post(
+    "/orgs/{org_id}/billing/portal", response_model=PortalResponse, status_code=201
+)
 @limiter.limit("10/minute")
 async def create_portal(
     request: Request,
@@ -70,7 +78,9 @@ async def create_portal(
     return await service.create_portal(org_id, user_id, return_url=str(body.return_url))
 
 
-@router.post("/orgs/{org_id}/billing/upgrade", response_model=MessageResponse, status_code=200)
+@router.post(
+    "/orgs/{org_id}/billing/upgrade", response_model=MessageResponse, status_code=200
+)
 @limiter.limit("10/minute")
 async def upgrade_subscription(
     request: Request,
@@ -80,11 +90,15 @@ async def upgrade_subscription(
     service: BillingSvc,
 ) -> MessageResponse:
     """Upgrade an active subscription in-place to a higher plan."""
-    await service.upgrade_subscription(org_id, user_id, plan=body.plan, period=body.period)
+    await service.upgrade_subscription(
+        org_id, user_id, plan=body.plan, period=body.period
+    )
     return MessageResponse(message="Subscription upgraded")
 
 
-@router.post("/orgs/{org_id}/billing/cancel", response_model=MessageResponse, status_code=200)
+@router.post(
+    "/orgs/{org_id}/billing/cancel", response_model=MessageResponse, status_code=200
+)
 @limiter.limit("10/minute")
 async def cancel_subscription(
     request: Request,

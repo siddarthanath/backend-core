@@ -23,7 +23,9 @@ from src.schemas.auth import UserClaims
 
 def _override_user(uid: uuid.UUID) -> None:
     """Switch the auth override to a different user mid-test."""
-    claims = UserClaims(sub=str(uid), email=f"test-{uid}@example.com", role="authenticated")
+    claims = UserClaims(
+        sub=str(uid), email=f"test-{uid}@example.com", role="authenticated"
+    )
     app.dependency_overrides[get_current_user] = lambda: claims
 
 
@@ -40,9 +42,13 @@ async def _cleanup(
 ) -> None:
     """Delete test orgs (cascades memberships) then test users."""
     if org_ids:
-        await db_session.execute(delete(Organisation).where(Organisation.id.in_(org_ids)))
+        await db_session.execute(
+            delete(Organisation).where(Organisation.id.in_(org_ids))
+        )
     if user_ids:
-        await db_session.execute(delete(UserProfile).where(UserProfile.id.in_(user_ids)))
+        await db_session.execute(
+            delete(UserProfile).where(UserProfile.id.in_(user_ids))
+        )
     await db_session.commit()
 
 
@@ -56,7 +62,9 @@ async def test_create_org_returns_201_and_creator_is_owner(
     await authed_client.get("/api/v1/user/me")
     slug = f"test-org-{uuid.uuid4().hex[:8]}"
 
-    response = await authed_client.post("/api/v1/orgs", json={"name": "My Org", "slug": slug})
+    response = await authed_client.post(
+        "/api/v1/orgs", json={"name": "My Org", "slug": slug}
+    )
 
     assert response.status_code == 201
     data = response.json()
@@ -126,7 +134,9 @@ async def test_get_org_non_member_returns_403(
 ) -> None:
     await authed_client.get("/api/v1/user/me")
     slug = f"test-nm-{uuid.uuid4().hex[:8]}"
-    r = await authed_client.post("/api/v1/orgs", json={"name": "Private Org", "slug": slug})
+    r = await authed_client.post(
+        "/api/v1/orgs", json={"name": "Private Org", "slug": slug}
+    )
     org_id = uuid.UUID(r.json()["id"])
 
     outsider_id = uuid.uuid4()
@@ -164,7 +174,9 @@ async def test_update_org_member_cannot_update_returns_403(
     _override_user(member_id)
     await authed_client.post(f"/api/v1/orgs/{org_id}/members/accept")
 
-    response = await authed_client.patch(f"/api/v1/orgs/{org_id}", json={"name": "Hacked"})
+    response = await authed_client.patch(
+        f"/api/v1/orgs/{org_id}", json={"name": "Hacked"}
+    )
     assert response.status_code == 403
 
     _override_user(user_id)
@@ -180,7 +192,9 @@ async def test_invite_and_accept_member(
 ) -> None:
     await authed_client.get("/api/v1/user/me")
     slug = f"test-inv-{uuid.uuid4().hex[:8]}"
-    r = await authed_client.post("/api/v1/orgs", json={"name": "Invite Org", "slug": slug})
+    r = await authed_client.post(
+        "/api/v1/orgs", json={"name": "Invite Org", "slug": slug}
+    )
     org_id = uuid.UUID(r.json()["id"])
 
     invitee_id = uuid.uuid4()
@@ -216,7 +230,9 @@ async def test_change_role_owner_can_promote_member_to_admin(
 ) -> None:
     await authed_client.get("/api/v1/user/me")
     slug = f"test-role-{uuid.uuid4().hex[:8]}"
-    r = await authed_client.post("/api/v1/orgs", json={"name": "Role Org", "slug": slug})
+    r = await authed_client.post(
+        "/api/v1/orgs", json={"name": "Role Org", "slug": slug}
+    )
     org_id = uuid.UUID(r.json()["id"])
 
     member_id = uuid.uuid4()
@@ -251,7 +267,9 @@ async def test_change_role_member_cannot_promote_returns_403(
 ) -> None:
     await authed_client.get("/api/v1/user/me")
     slug = f"test-norole-{uuid.uuid4().hex[:8]}"
-    r = await authed_client.post("/api/v1/orgs", json={"name": "No Role Org", "slug": slug})
+    r = await authed_client.post(
+        "/api/v1/orgs", json={"name": "No Role Org", "slug": slug}
+    )
     org_id = uuid.UUID(r.json()["id"])
 
     member_id = uuid.uuid4()
@@ -285,7 +303,9 @@ async def test_remove_member(
 ) -> None:
     await authed_client.get("/api/v1/user/me")
     slug = f"test-rm-{uuid.uuid4().hex[:8]}"
-    r = await authed_client.post("/api/v1/orgs", json={"name": "Remove Org", "slug": slug})
+    r = await authed_client.post(
+        "/api/v1/orgs", json={"name": "Remove Org", "slug": slug}
+    )
     org_id = uuid.UUID(r.json()["id"])
 
     member_id = uuid.uuid4()

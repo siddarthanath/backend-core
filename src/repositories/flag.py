@@ -39,7 +39,9 @@ class FlagRepository(BaseRepository[FeatureFlag]):
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_by_org_and_key(self, org_id: uuid.UUID, key: str) -> FeatureFlag | None:
+    async def get_by_org_and_key(
+        self, org_id: uuid.UUID, key: str
+    ) -> FeatureFlag | None:
         """Return a single flag by org and key.
 
         Args:

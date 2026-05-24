@@ -8,4 +8,12 @@ from src.models.flag import FeatureFlag
 from src.models.org import Membership, Organisation
 from src.models.user import UserProfile
 
-__all__ = ["UserProfile", "Organisation", "Membership", "Subscription", "AuditLog", "FeatureFlag", "ApiKey"]
+__all__ = [
+    "UserProfile",
+    "Organisation",
+    "Membership",
+    "Subscription",
+    "AuditLog",
+    "FeatureFlag",
+    "ApiKey",
+]

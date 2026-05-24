@@ -38,7 +38,9 @@ class OrgService:
         self.user_repo = user_repo
         self.email_service = email_service
 
-    async def get_or_create_personal(self, user_id: uuid.UUID, email: str) -> Organisation:
+    async def get_or_create_personal(
+        self, user_id: uuid.UUID, email: str
+    ) -> Organisation:
         """Return the user's personal org, creating it on first call.
 
         Idempotent — safe to call on every login. The org slug is derived from
@@ -76,7 +78,9 @@ class OrgService:
         """
         return await self.org_repo.get_user_orgs(user_id)
 
-    async def list_members(self, org_id: uuid.UUID, user_id: uuid.UUID) -> list[MemberResponse]:
+    async def list_members(
+        self, org_id: uuid.UUID, user_id: uuid.UUID
+    ) -> list[MemberResponse]:
         """Return active members of an org with email. User must be a member.
 
         Args:
@@ -123,7 +127,9 @@ class OrgService:
         if await self.org_repo.get_by_slug(slug):
             raise ConflictError("Organisation", "slug", slug)
 
-        org = await self.org_repo.create(Organisation(name=name, slug=slug, is_personal=is_personal))
+        org = await self.org_repo.create(
+            Organisation(name=name, slug=slug, is_personal=is_personal)
+        )
         await self.membership_repo.create(
             Membership(
                 user_id=user_id,
@@ -217,7 +223,9 @@ class OrgService:
         """
         if not await self.membership_repo.user_has_role(inviter_id, org_id, Role.ADMIN):
             raise ForbiddenError("Only admins can invite members")
-        if role == Role.OWNER and not await self.membership_repo.user_has_role(inviter_id, org_id, Role.OWNER):
+        if role == Role.OWNER and not await self.membership_repo.user_has_role(
+            inviter_id, org_id, Role.OWNER
+        ):
             raise ForbiddenError("Only owners can assign the owner role")
 
         invitee = await self.user_repo.get_by_email(email)
@@ -241,7 +249,9 @@ class OrgService:
                 invited_by=inviter_id,
             )
         )
-        accept_url = f"{app_settings.FRONTEND_BASE_URL}/app/invite/accept?org_id={org_id}"
+        accept_url = (
+            f"{app_settings.FRONTEND_BASE_URL}/app/invite/accept?org_id={org_id}"
+        )
         try:
             await self.email_service.send(
                 to=invitee.email,
@@ -254,7 +264,9 @@ class OrgService:
         except Exception:
             # Delivery failure does not roll back the membership row — the invite is valid.
             # The admin can re-send via a future resend-invite endpoint.
-            log.warning("invite.email_failed", org_id=str(org_id), invitee=invitee.email)
+            log.warning(
+                "invite.email_failed", org_id=str(org_id), invitee=invitee.email
+            )
         return membership
 
     async def accept_invite(self, org_id: uuid.UUID, user_id: uuid.UUID) -> Membership:
@@ -274,7 +286,9 @@ class OrgService:
         membership = await self.membership_repo.get_membership(user_id, org_id)
         if not membership or membership.status != MembershipStatus.INVITED:
             raise NotFoundError("Invite", org_id)
-        return await self.membership_repo.update(membership, status=MembershipStatus.ACTIVE)
+        return await self.membership_repo.update(
+            membership, status=MembershipStatus.ACTIVE
+        )
 
     async def change_role(
         self,
@@ -299,7 +313,9 @@ class OrgService:
             Membership: The updated membership.
 
         """
-        if not await self.membership_repo.user_has_role(requester_id, org_id, Role.OWNER):
+        if not await self.membership_repo.user_has_role(
+            requester_id, org_id, Role.OWNER
+        ):
             raise ForbiddenError("Only owners can change member roles")
 
         membership = await self.membership_repo.get_membership(target_user_id, org_id)
@@ -344,7 +360,9 @@ class OrgService:
             NotFoundError: If the target user is not a member.
 
         """
-        if not await self.membership_repo.user_has_role(requester_id, org_id, Role.ADMIN):
+        if not await self.membership_repo.user_has_role(
+            requester_id, org_id, Role.ADMIN
+        ):
             raise ForbiddenError("Only admins can remove members")
 
         membership = await self.membership_repo.get_membership(target_user_id, org_id)
@@ -352,7 +370,9 @@ class OrgService:
             raise NotFoundError("Membership", target_user_id)
 
         if membership.role == Role.OWNER:
-            if not await self.membership_repo.user_has_role(requester_id, org_id, Role.OWNER):
+            if not await self.membership_repo.user_has_role(
+                requester_id, org_id, Role.OWNER
+            ):
                 raise ForbiddenError("Only owners can remove other owners")
             if await self.membership_repo.count_owners(org_id) <= 1:
                 raise ForbiddenError("Cannot remove the last owner of an organisation")

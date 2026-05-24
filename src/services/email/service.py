@@ -46,12 +46,14 @@ class EmailService:
             log.debug("email.skipped_no_api_key", to=to, subject=subject)
             return
 
-        payload = json.dumps({
-            "from": self._from_address,
-            "to": [to],
-            "subject": subject,
-            "html": html,
-        }).encode()
+        payload = json.dumps(
+            {
+                "from": self._from_address,
+                "to": [to],
+                "subject": subject,
+                "html": html,
+            }
+        ).encode()
 
         await anyio.to_thread.run_sync(lambda: self._post(payload))
 

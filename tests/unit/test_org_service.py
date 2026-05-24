@@ -121,7 +121,9 @@ class TestInviteMember:
         membership_repo.user_has_role.return_value = False
 
         with pytest.raises(ForbiddenError):
-            await service.invite_member(uuid.uuid4(), inviter_id=uuid.uuid4(), email="x@example.com")
+            await service.invite_member(
+                uuid.uuid4(), inviter_id=uuid.uuid4(), email="x@example.com"
+            )
 
     @pytest.mark.unit
     @pytest.mark.asyncio
@@ -131,7 +133,9 @@ class TestInviteMember:
         user_repo.get_by_email.return_value = None
 
         with pytest.raises(NotFoundError):
-            await service.invite_member(uuid.uuid4(), inviter_id=uuid.uuid4(), email="nobody@example.com")
+            await service.invite_member(
+                uuid.uuid4(), inviter_id=uuid.uuid4(), email="nobody@example.com"
+            )
 
     @pytest.mark.unit
     @pytest.mark.asyncio
@@ -142,7 +146,9 @@ class TestInviteMember:
         membership_repo.get_membership.return_value = make_membership()
 
         with pytest.raises(ConflictError):
-            await service.invite_member(uuid.uuid4(), inviter_id=uuid.uuid4(), email="existing@example.com")
+            await service.invite_member(
+                uuid.uuid4(), inviter_id=uuid.uuid4(), email="existing@example.com"
+            )
 
     @pytest.mark.unit
     @pytest.mark.asyncio
@@ -152,7 +158,12 @@ class TestInviteMember:
         membership_repo.user_has_role.side_effect = [True, False]
 
         with pytest.raises(ForbiddenError, match="owner"):
-            await service.invite_member(uuid.uuid4(), inviter_id=uuid.uuid4(), email="x@example.com", role=Role.OWNER)
+            await service.invite_member(
+                uuid.uuid4(),
+                inviter_id=uuid.uuid4(),
+                email="x@example.com",
+                role=Role.OWNER,
+            )
 
 
 class TestAcceptInvite:
@@ -169,7 +180,9 @@ class TestAcceptInvite:
     @pytest.mark.asyncio
     async def test_raises_not_found_when_already_active(self) -> None:
         service, _, membership_repo, _ = make_service()
-        membership_repo.get_membership.return_value = make_membership(status=MembershipStatus.ACTIVE)
+        membership_repo.get_membership.return_value = make_membership(
+            status=MembershipStatus.ACTIVE
+        )
 
         with pytest.raises(NotFoundError):
             await service.accept_invite(uuid.uuid4(), uuid.uuid4())
@@ -183,7 +196,12 @@ class TestChangeRole:
         membership_repo.user_has_role.return_value = False
 
         with pytest.raises(ForbiddenError):
-            await service.change_role(uuid.uuid4(), requester_id=uuid.uuid4(), target_user_id=uuid.uuid4(), new_role=Role.ADMIN)
+            await service.change_role(
+                uuid.uuid4(),
+                requester_id=uuid.uuid4(),
+                target_user_id=uuid.uuid4(),
+                new_role=Role.ADMIN,
+            )
 
     @pytest.mark.unit
     @pytest.mark.asyncio
@@ -193,7 +211,12 @@ class TestChangeRole:
         membership_repo.get_membership.return_value = None
 
         with pytest.raises(NotFoundError):
-            await service.change_role(uuid.uuid4(), requester_id=uuid.uuid4(), target_user_id=uuid.uuid4(), new_role=Role.ADMIN)
+            await service.change_role(
+                uuid.uuid4(),
+                requester_id=uuid.uuid4(),
+                target_user_id=uuid.uuid4(),
+                new_role=Role.ADMIN,
+            )
 
 
 class TestRemoveMember:
@@ -204,7 +227,9 @@ class TestRemoveMember:
         membership_repo.user_has_role.return_value = False
 
         with pytest.raises(ForbiddenError):
-            await service.remove_member(uuid.uuid4(), requester_id=uuid.uuid4(), target_user_id=uuid.uuid4())
+            await service.remove_member(
+                uuid.uuid4(), requester_id=uuid.uuid4(), target_user_id=uuid.uuid4()
+            )
 
     @pytest.mark.unit
     @pytest.mark.asyncio
@@ -214,7 +239,9 @@ class TestRemoveMember:
         membership_repo.get_membership.return_value = None
 
         with pytest.raises(NotFoundError):
-            await service.remove_member(uuid.uuid4(), requester_id=uuid.uuid4(), target_user_id=uuid.uuid4())
+            await service.remove_member(
+                uuid.uuid4(), requester_id=uuid.uuid4(), target_user_id=uuid.uuid4()
+            )
 
     @pytest.mark.unit
     @pytest.mark.asyncio
@@ -225,7 +252,9 @@ class TestRemoveMember:
         membership_repo.get_membership.return_value = make_membership(role=Role.OWNER)
 
         with pytest.raises(ForbiddenError, match="owner"):
-            await service.remove_member(uuid.uuid4(), requester_id=uuid.uuid4(), target_user_id=uuid.uuid4())
+            await service.remove_member(
+                uuid.uuid4(), requester_id=uuid.uuid4(), target_user_id=uuid.uuid4()
+            )
 
     @pytest.mark.unit
     @pytest.mark.asyncio
@@ -236,7 +265,9 @@ class TestRemoveMember:
         membership_repo.count_owners.return_value = 1
 
         with pytest.raises(ForbiddenError, match="last owner"):
-            await service.remove_member(uuid.uuid4(), requester_id=uuid.uuid4(), target_user_id=uuid.uuid4())
+            await service.remove_member(
+                uuid.uuid4(), requester_id=uuid.uuid4(), target_user_id=uuid.uuid4()
+            )
 
 
 class TestCleanupForDeletedUser:

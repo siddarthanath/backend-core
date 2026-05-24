@@ -46,7 +46,9 @@ def add_middleware(app: FastAPI) -> None:
     app.add_middleware(TimeoutMiddleware)
     app.add_middleware(APILoggingMiddleware)
     app.add_middleware(RequestLoggingMiddleware)
-    app.add_middleware(BodySizeLimitMiddleware, max_bytes=app_settings.MAX_BODY_SIZE_MB * 1024 * 1024)
+    app.add_middleware(
+        BodySizeLimitMiddleware, max_bytes=app_settings.MAX_BODY_SIZE_MB * 1024 * 1024
+    )
     app.add_middleware(SlowAPIMiddleware)
-    
+
     add_cors(app)

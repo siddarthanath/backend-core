@@ -23,7 +23,12 @@ def make_service(*, repo=None, org_repo=None, membership_repo=None):
     repo = repo or AsyncMock(spec=AuditRepository)
     org_repo = org_repo or AsyncMock(spec=OrgRepository)
     membership_repo = membership_repo or AsyncMock(spec=MembershipRepository)
-    return AuditService(repo=repo, org_repo=org_repo, membership_repo=membership_repo), repo, org_repo, membership_repo
+    return (
+        AuditService(repo=repo, org_repo=org_repo, membership_repo=membership_repo),
+        repo,
+        org_repo,
+        membership_repo,
+    )
 
 
 def make_log(**kwargs):
@@ -47,7 +52,12 @@ class TestLogEvent:
         svc, repo, _, _ = make_service()
         org_id = uuid.uuid4()
         actor_id = uuid.uuid4()
-        stored = make_log(org_id=org_id, actor_id=actor_id, action="member.invited", resource_type="member")
+        stored = make_log(
+            org_id=org_id,
+            actor_id=actor_id,
+            action="member.invited",
+            resource_type="member",
+        )
         repo.create.return_value = stored
 
         result = await svc.log_event(
@@ -71,7 +81,9 @@ class TestLogEvent:
         stored = make_log(actor_id=None, action="system.cleanup")
         repo.create.return_value = stored
 
-        result = await svc.log_event(org_id=uuid.uuid4(), action="system.cleanup", resource_type="system")
+        result = await svc.log_event(
+            org_id=uuid.uuid4(), action="system.cleanup", resource_type="system"
+        )
         assert result.actor_id is None
 
 

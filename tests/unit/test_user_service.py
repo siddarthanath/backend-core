@@ -88,7 +88,9 @@ class TestUpdateProfile:
         f.repo.get_by_id.return_value = profile
         f.repo.update.return_value = profile
 
-        await f.service.update_profile(uuid.uuid4(), first_name="Ada", last_name="Lovelace")
+        await f.service.update_profile(
+            uuid.uuid4(), first_name="Ada", last_name="Lovelace"
+        )
 
         _, kwargs = f.repo.update.call_args
         assert kwargs["first_name"] == "Ada"

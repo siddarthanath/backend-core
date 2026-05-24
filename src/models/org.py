@@ -62,8 +62,16 @@ class Membership(UUIDMixin, TimestampMixin, SQLModel, table=True):
         index=True,
         nullable=False,
     )
-    role: Role = Field(default=Role.MEMBER, nullable=False, sa_type=sa.Enum(Role, name="role", create_type=True))
-    status: MembershipStatus = Field(default=MembershipStatus.INVITED, nullable=False, sa_type=sa.Enum(MembershipStatus, name="membershipstatus", create_type=True))
+    role: Role = Field(
+        default=Role.MEMBER,
+        nullable=False,
+        sa_type=sa.Enum(Role, name="role", create_type=True),
+    )
+    status: MembershipStatus = Field(
+        default=MembershipStatus.INVITED,
+        nullable=False,
+        sa_type=sa.Enum(MembershipStatus, name="membershipstatus", create_type=True),
+    )
     invited_by: Optional[uuid.UUID] = Field(
         default=None,
         foreign_key="user_profiles.id",

@@ -58,10 +58,9 @@ class AuditRepository(BaseRepository[AuditLog]):
 
         """
         from sqlalchemy import func
+
         stmt = (
-            select(func.count())
-            .select_from(AuditLog)
-            .where(AuditLog.org_id == org_id)
+            select(func.count()).select_from(AuditLog).where(AuditLog.org_id == org_id)
         )
         result = await self.session.execute(stmt)
         return result.scalar_one()

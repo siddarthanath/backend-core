@@ -39,11 +39,29 @@ class BodySizeLimitMiddleware(BaseHTTPMiddleware):
             try:
                 length = int(content_length)
             except ValueError:
-                return JSONResponse(status_code=400, content={"error": {"code": "BAD_REQUEST", "message": "Invalid Content-Length header"}})
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "error": {
+                            "code": "BAD_REQUEST",
+                            "message": "Invalid Content-Length header",
+                        }
+                    },
+                )
             if length > self.max_bytes:
-                log.warning("request.body_too_large", bytes=length, limit=self.max_bytes, path=request.url.path)
+                log.warning(
+                    "request.body_too_large",
+                    bytes=length,
+                    limit=self.max_bytes,
+                    path=request.url.path,
+                )
                 return JSONResponse(
                     status_code=413,
-                    content={"error": {"code": "PAYLOAD_TOO_LARGE", "message": f"Request body must not exceed {self.max_bytes // (1024 * 1024)} MB"}},
+                    content={
+                        "error": {
+                            "code": "PAYLOAD_TOO_LARGE",
+                            "message": f"Request body must not exceed {self.max_bytes // (1024 * 1024)} MB",
+                        }
+                    },
                 )
         return await call_next(request)  # type: ignore[misc]

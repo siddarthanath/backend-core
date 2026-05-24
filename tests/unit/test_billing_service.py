@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 # Private Library
-from src.constants import BillingPeriod, Plan, Role, SubscriptionStatus
+from src.constants import BillingPeriod, Plan, SubscriptionStatus
 from src.core.exceptions.types import ConflictError, ForbiddenError, NotFoundError
 from src.repositories.billing import SubscriptionRepository
 from src.repositories.org import MembershipRepository, OrgRepository
@@ -61,7 +61,9 @@ def make_subscription(**kwargs):
     return sub
 
 
-def make_stripe_subscription_dict(*, price_id: str = "price_pro_monthly", period_end: int = 9999999999) -> dict:
+def make_stripe_subscription_dict(
+    *, price_id: str = "price_pro_monthly", period_end: int = 9999999999
+) -> dict:
     """Return a minimal dict shaped like stripe.Subscription.to_dict()."""
     return {
         "id": "sub_test123",
@@ -69,9 +71,11 @@ def make_stripe_subscription_dict(*, price_id: str = "price_pro_monthly", period
         "cancel_at_period_end": False,
         "current_period_end": period_end,
         "items": {
-            "data": [{
-                "price": {"id": price_id},
-            }]
+            "data": [
+                {
+                    "price": {"id": price_id},
+                }
+            ]
         },
     }
 
@@ -99,7 +103,9 @@ class TestGetSubscription:
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_returns_upserted_free_sub(self) -> None:
-        orchestrator, subscription_repo, org_repo, membership_repo, _ = make_orchestrator()
+        orchestrator, subscription_repo, org_repo, membership_repo, _ = (
+            make_orchestrator()
+        )
         org = make_org()
         sub = make_subscription(org_id=org.id)
         org_repo.get_by_id.return_value = org
@@ -122,7 +128,12 @@ class TestCreateCheckout:
 
         with pytest.raises(ForbiddenError):
             await orchestrator.create_checkout(
-                uuid.uuid4(), uuid.uuid4(), Plan.PRO, BillingPeriod.MONTHLY, "https://success.example.com", "https://cancel.example.com"
+                uuid.uuid4(),
+                uuid.uuid4(),
+                Plan.PRO,
+                BillingPeriod.MONTHLY,
+                "https://success.example.com",
+                "https://cancel.example.com",
             )
 
     @pytest.mark.unit
@@ -135,13 +146,20 @@ class TestCreateCheckout:
 
         with pytest.raises(ConflictError):
             await orchestrator.create_checkout(
-                uuid.uuid4(), uuid.uuid4(), plan, BillingPeriod.MONTHLY, "https://success.example.com", "https://cancel.example.com"
+                uuid.uuid4(),
+                uuid.uuid4(),
+                plan,
+                BillingPeriod.MONTHLY,
+                "https://success.example.com",
+                "https://cancel.example.com",
             )
 
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_raises_conflict_when_already_on_plan(self) -> None:
-        orchestrator, subscription_repo, org_repo, membership_repo, _ = make_orchestrator()
+        orchestrator, subscription_repo, org_repo, membership_repo, _ = (
+            make_orchestrator()
+        )
         org_repo.get_by_id.return_value = make_org()
         membership_repo.user_has_role.return_value = True
         subscription_repo.upsert_free.return_value = make_subscription(
@@ -150,22 +168,40 @@ class TestCreateCheckout:
 
         with pytest.raises(ConflictError):
             await orchestrator.create_checkout(
-                uuid.uuid4(), uuid.uuid4(), Plan.PRO, BillingPeriod.MONTHLY, "https://success.example.com", "https://cancel.example.com"
+                uuid.uuid4(),
+                uuid.uuid4(),
+                Plan.PRO,
+                BillingPeriod.MONTHLY,
+                "https://success.example.com",
+                "https://cancel.example.com",
             )
 
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_calls_billing_svc_and_returns_url(self) -> None:
-        orchestrator, subscription_repo, org_repo, membership_repo, billing_svc = make_orchestrator()
+        orchestrator, subscription_repo, org_repo, membership_repo, billing_svc = (
+            make_orchestrator()
+        )
         org = make_org()
         org_repo.get_by_id.return_value = org
         membership_repo.user_has_role.return_value = True
         subscription_repo.upsert_free.return_value = make_subscription(plan=Plan.FREE)
-        billing_svc.create_checkout_session.return_value = ("https://checkout.stripe.com/xyz", "cus_123")
+        billing_svc.create_checkout_session.return_value = (
+            "https://checkout.stripe.com/xyz",
+            "cus_123",
+        )
 
-        with patch("src.services.billing.service._build_price_map", return_value={(Plan.PRO, BillingPeriod.MONTHLY): "price_pro_monthly_123"}):
+        with patch(
+            "src.services.billing.service._build_price_map",
+            return_value={(Plan.PRO, BillingPeriod.MONTHLY): "price_pro_monthly_123"},
+        ):
             result = await orchestrator.create_checkout(
-                org.id, uuid.uuid4(), Plan.PRO, BillingPeriod.MONTHLY, "https://success.example.com", "https://cancel.example.com"
+                org.id,
+                uuid.uuid4(),
+                Plan.PRO,
+                BillingPeriod.MONTHLY,
+                "https://success.example.com",
+                "https://cancel.example.com",
             )
 
         billing_svc.create_checkout_session.assert_awaited_once()
@@ -174,7 +210,9 @@ class TestCreateCheckout:
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_raises_when_price_id_not_configured(self) -> None:
-        orchestrator, subscription_repo, org_repo, membership_repo, _ = make_orchestrator()
+        orchestrator, subscription_repo, org_repo, membership_repo, _ = (
+            make_orchestrator()
+        )
         org_repo.get_by_id.return_value = make_org()
         membership_repo.user_has_role.return_value = True
         subscription_repo.upsert_free.return_value = make_subscription(plan=Plan.FREE)
@@ -182,29 +220,46 @@ class TestCreateCheckout:
         with patch("src.services.billing.service._build_price_map", return_value={}):
             with pytest.raises(ValueError, match="No Stripe price ID configured"):
                 await orchestrator.create_checkout(
-                    uuid.uuid4(), uuid.uuid4(), Plan.PRO, BillingPeriod.MONTHLY,
-                    "https://success.example.com", "https://cancel.example.com",
+                    uuid.uuid4(),
+                    uuid.uuid4(),
+                    Plan.PRO,
+                    BillingPeriod.MONTHLY,
+                    "https://success.example.com",
+                    "https://cancel.example.com",
                 )
 
     @pytest.mark.unit
     @pytest.mark.asyncio
     @pytest.mark.parametrize("period", [BillingPeriod.MONTHLY, BillingPeriod.YEARLY])
-    async def test_routes_correct_price_id_per_period(self, period: BillingPeriod) -> None:
-        orchestrator, subscription_repo, org_repo, membership_repo, billing_svc = make_orchestrator()
+    async def test_routes_correct_price_id_per_period(
+        self, period: BillingPeriod
+    ) -> None:
+        orchestrator, subscription_repo, org_repo, membership_repo, billing_svc = (
+            make_orchestrator()
+        )
         org = make_org()
         org_repo.get_by_id.return_value = org
         membership_repo.user_has_role.return_value = True
         subscription_repo.upsert_free.return_value = make_subscription(plan=Plan.FREE)
-        billing_svc.create_checkout_session.return_value = ("https://checkout.stripe.com/xyz", "cus_123")
+        billing_svc.create_checkout_session.return_value = (
+            "https://checkout.stripe.com/xyz",
+            "cus_123",
+        )
 
         price_map = {
             (Plan.PRO, BillingPeriod.MONTHLY): "price_pro_monthly",
             (Plan.PRO, BillingPeriod.YEARLY): "price_pro_yearly",
         }
-        with patch("src.services.billing.service._build_price_map", return_value=price_map):
+        with patch(
+            "src.services.billing.service._build_price_map", return_value=price_map
+        ):
             await orchestrator.create_checkout(
-                org.id, uuid.uuid4(), Plan.PRO, period,
-                "https://success.example.com", "https://cancel.example.com",
+                org.id,
+                uuid.uuid4(),
+                Plan.PRO,
+                period,
+                "https://success.example.com",
+                "https://cancel.example.com",
             )
 
         _, call_kwargs = billing_svc.create_checkout_session.call_args
@@ -221,7 +276,10 @@ class TestPlanFromPrice:
             membership_repo=AsyncMock(),
             billing_svc=billing_svc,
         )
-        with patch("src.services.billing.service._build_price_map", return_value={(Plan.PRO, BillingPeriod.MONTHLY): "price_known"}):
+        with patch(
+            "src.services.billing.service._build_price_map",
+            return_value={(Plan.PRO, BillingPeriod.MONTHLY): "price_known"},
+        ):
             with pytest.raises(ValueError, match="Unknown Stripe price ID"):
                 orchestrator._plan_from_price("price_unknown")
 
@@ -235,7 +293,9 @@ class TestCreatePortal:
         membership_repo.user_has_role.return_value = False
 
         with pytest.raises(ForbiddenError):
-            await orchestrator.create_portal(uuid.uuid4(), uuid.uuid4(), "https://return.example.com")
+            await orchestrator.create_portal(
+                uuid.uuid4(), uuid.uuid4(), "https://return.example.com"
+            )
 
     @pytest.mark.unit
     @pytest.mark.asyncio
@@ -245,7 +305,9 @@ class TestCreatePortal:
         membership_repo.user_has_role.return_value = True
 
         with pytest.raises(ForbiddenError, match="No billing account"):
-            await orchestrator.create_portal(uuid.uuid4(), uuid.uuid4(), "https://return.example.com")
+            await orchestrator.create_portal(
+                uuid.uuid4(), uuid.uuid4(), "https://return.example.com"
+            )
 
 
 class TestHandleWebhook:
@@ -253,7 +315,9 @@ class TestHandleWebhook:
     @pytest.mark.asyncio
     async def test_raises_on_invalid_signature(self) -> None:
         orchestrator, _, _, _, billing_svc = make_orchestrator()
-        billing_svc.parse_webhook.side_effect = ValueError("Invalid Stripe webhook signature")
+        billing_svc.parse_webhook.side_effect = ValueError(
+            "Invalid Stripe webhook signature"
+        )
 
         with pytest.raises(ValueError, match="Invalid Stripe webhook signature"):
             await orchestrator.handle_webhook(b"payload", "bad-sig")
@@ -262,7 +326,10 @@ class TestHandleWebhook:
     @pytest.mark.asyncio
     async def test_ignores_unknown_event_type(self) -> None:
         orchestrator, subscription_repo, _, _, billing_svc = make_orchestrator()
-        billing_svc.parse_webhook.return_value = {"type": "unknown.event", "data": {"object": {}}}
+        billing_svc.parse_webhook.return_value = {
+            "type": "unknown.event",
+            "data": {"object": {}},
+        }
 
         await orchestrator.handle_webhook(b"payload", "sig")
 
@@ -278,18 +345,27 @@ class TestHandleWebhook:
 
         billing_svc.parse_webhook.return_value = {
             "type": "checkout.session.completed",
-            "data": {"object": {
-                "metadata": {"org_id": str(org_id)},
-                "subscription": "sub_test123",
-                "customer": "cus_test123",
-            }},
+            "data": {
+                "object": {
+                    "metadata": {"org_id": str(org_id)},
+                    "subscription": "sub_test123",
+                    "customer": "cus_test123",
+                }
+            },
         }
         org_repo.get_by_id.return_value = org
         subscription_repo.get_by_org.return_value = sub
 
         stripe_sub_dict = make_stripe_subscription_dict(price_id="price_pro_monthly")
-        with patch("src.services.billing.service._build_price_map", return_value={(Plan.PRO, BillingPeriod.MONTHLY): "price_pro_monthly"}):
-            with patch("anyio.to_thread.run_sync", new_callable=AsyncMock, return_value=MagicMock(to_dict=lambda: stripe_sub_dict)):
+        with patch(
+            "src.services.billing.service._build_price_map",
+            return_value={(Plan.PRO, BillingPeriod.MONTHLY): "price_pro_monthly"},
+        ):
+            with patch(
+                "anyio.to_thread.run_sync",
+                new_callable=AsyncMock,
+                return_value=MagicMock(to_dict=lambda: stripe_sub_dict),
+            ):
                 await orchestrator.handle_webhook(b"payload", "sig")
 
         subscription_repo.update.assert_awaited_once()
@@ -308,25 +384,36 @@ class TestHandleWebhook:
 
         billing_svc.parse_webhook.return_value = {
             "type": "checkout.session.completed",
-            "data": {"object": {
-                "metadata": {"org_id": str(org_id)},
-                "subscription": "sub_test123",
-                "customer": "cus_new123",
-            }},
+            "data": {
+                "object": {
+                    "metadata": {"org_id": str(org_id)},
+                    "subscription": "sub_test123",
+                    "customer": "cus_new123",
+                }
+            },
         }
         org_repo.get_by_id.return_value = org
         subscription_repo.get_by_org.return_value = sub
 
         stripe_sub_dict = make_stripe_subscription_dict()
-        with patch("src.services.billing.service._build_price_map", return_value={(Plan.PRO, BillingPeriod.MONTHLY): "price_pro_monthly"}):
-            with patch("anyio.to_thread.run_sync", new_callable=AsyncMock, return_value=MagicMock(to_dict=lambda: stripe_sub_dict)):
+        with patch(
+            "src.services.billing.service._build_price_map",
+            return_value={(Plan.PRO, BillingPeriod.MONTHLY): "price_pro_monthly"},
+        ):
+            with patch(
+                "anyio.to_thread.run_sync",
+                new_callable=AsyncMock,
+                return_value=MagicMock(to_dict=lambda: stripe_sub_dict),
+            ):
                 await orchestrator.handle_webhook(b"payload", "sig")
 
         org_repo.update.assert_awaited_once_with(org, stripe_customer_id="cus_new123")
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_checkout_completed_skips_customer_update_if_already_set(self) -> None:
+    async def test_checkout_completed_skips_customer_update_if_already_set(
+        self,
+    ) -> None:
         orchestrator, subscription_repo, org_repo, _, billing_svc = make_orchestrator()
         org_id = uuid.uuid4()
         org = make_org(id=org_id, stripe_customer_id="cus_existing")
@@ -334,18 +421,27 @@ class TestHandleWebhook:
 
         billing_svc.parse_webhook.return_value = {
             "type": "checkout.session.completed",
-            "data": {"object": {
-                "metadata": {"org_id": str(org_id)},
-                "subscription": "sub_test123",
-                "customer": "cus_existing",
-            }},
+            "data": {
+                "object": {
+                    "metadata": {"org_id": str(org_id)},
+                    "subscription": "sub_test123",
+                    "customer": "cus_existing",
+                }
+            },
         }
         org_repo.get_by_id.return_value = org
         subscription_repo.get_by_org.return_value = sub
 
         stripe_sub_dict = make_stripe_subscription_dict()
-        with patch("src.services.billing.service._build_price_map", return_value={(Plan.PRO, BillingPeriod.MONTHLY): "price_pro_monthly"}):
-            with patch("anyio.to_thread.run_sync", new_callable=AsyncMock, return_value=MagicMock(to_dict=lambda: stripe_sub_dict)):
+        with patch(
+            "src.services.billing.service._build_price_map",
+            return_value={(Plan.PRO, BillingPeriod.MONTHLY): "price_pro_monthly"},
+        ):
+            with patch(
+                "anyio.to_thread.run_sync",
+                new_callable=AsyncMock,
+                return_value=MagicMock(to_dict=lambda: stripe_sub_dict),
+            ):
                 await orchestrator.handle_webhook(b"payload", "sig")
 
         org_repo.update.assert_not_awaited()
@@ -356,11 +452,13 @@ class TestHandleWebhook:
         orchestrator, subscription_repo, org_repo, _, billing_svc = make_orchestrator()
         billing_svc.parse_webhook.return_value = {
             "type": "checkout.session.completed",
-            "data": {"object": {
-                "metadata": {"org_id": str(uuid.uuid4())},
-                "subscription": "sub_test123",
-                "customer": "cus_test123",
-            }},
+            "data": {
+                "object": {
+                    "metadata": {"org_id": str(uuid.uuid4())},
+                    "subscription": "sub_test123",
+                    "customer": "cus_test123",
+                }
+            },
         }
         org_repo.get_by_id.return_value = None
 
@@ -377,16 +475,21 @@ class TestHandleWebhook:
 
         billing_svc.parse_webhook.return_value = {
             "type": "customer.subscription.updated",
-            "data": {"object": {
-                "id": "sub_test123",
-                "status": "active",
-                "cancel_at_period_end": True,
-                "current_period_end": 9999999999,
-                "items": {"data": [{"price": {"id": "price_pro_monthly"}}]},
-            }},
+            "data": {
+                "object": {
+                    "id": "sub_test123",
+                    "status": "active",
+                    "cancel_at_period_end": True,
+                    "current_period_end": 9999999999,
+                    "items": {"data": [{"price": {"id": "price_pro_monthly"}}]},
+                }
+            },
         }
 
-        with patch("src.services.billing.service._build_price_map", return_value={(Plan.PRO, BillingPeriod.MONTHLY): "price_pro_monthly"}):
+        with patch(
+            "src.services.billing.service._build_price_map",
+            return_value={(Plan.PRO, BillingPeriod.MONTHLY): "price_pro_monthly"},
+        ):
             await orchestrator.handle_webhook(b"payload", "sig")
 
         _, kwargs = subscription_repo.update.call_args

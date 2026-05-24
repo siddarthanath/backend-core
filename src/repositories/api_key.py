@@ -72,9 +72,7 @@ class ApiKeyRepository(BaseRepository[ApiKey]):
 
         """
         stmt = (
-            select(ApiKey)
-            .where(ApiKey.key_hash == key_hash)
-            .where(self._not_deleted())
+            select(ApiKey).where(ApiKey.key_hash == key_hash).where(self._not_deleted())
         )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()

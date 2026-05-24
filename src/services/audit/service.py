@@ -93,6 +93,7 @@ class AuditService:
         if not org:
             raise NotFoundError("Organisation", org_id)
         from src.constants import Role
+
         if not await self.membership_repo.user_has_role(user_id, org_id, Role.ADMIN):
             raise ForbiddenError("Only admins can view the audit log")
 

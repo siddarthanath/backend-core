@@ -46,7 +46,11 @@ class APILoggingMiddleware(BaseHTTPMiddleware):
                     log.debug("request.body", body=_decode_body(request_body))
 
                 async def receive() -> dict[str, object]:
-                    return {"type": "http.request", "body": request_body, "more_body": False}
+                    return {
+                        "type": "http.request",
+                        "body": request_body,
+                        "more_body": False,
+                    }
 
                 # NOTE: _receive is an internal Starlette attribute — check after Starlette upgrades.
                 request._receive = receive  # type: ignore[method-assign]
@@ -58,7 +62,12 @@ class APILoggingMiddleware(BaseHTTPMiddleware):
         content_type = response.headers.get("content-type", "")
         is_json = "application/json" in content_type
 
-        if not debug_enabled or not is_json or isinstance(response, StreamingResponse) or path in STREAMING_PATHS:
+        if (
+            not debug_enabled
+            or not is_json
+            or isinstance(response, StreamingResponse)
+            or path in STREAMING_PATHS
+        ):
             return response
 
         try:
@@ -80,6 +89,8 @@ class APILoggingMiddleware(BaseHTTPMiddleware):
                 headers=dict(response.headers),
                 media_type=response.media_type,
             )
-        except Exception:  # Body logging is best-effort; serve the plain response on failure
+        except (
+            Exception
+        ):  # Body logging is best-effort; serve the plain response on failure
             log.exception("response.body_logging_failed")
             return response

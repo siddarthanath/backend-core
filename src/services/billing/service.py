@@ -14,10 +14,13 @@ import stripe
 from src.configs.settings import external_settings
 from src.constants import BillingPeriod, Plan, Role, SubscriptionStatus
 from src.core.exceptions.types import ConflictError, ForbiddenError, NotFoundError
-from src.models.billing import Subscription
 from src.repositories.billing import SubscriptionRepository
 from src.repositories.org import MembershipRepository, OrgRepository
-from src.schemas.billing.responses import CheckoutResponse, PortalResponse, SubscriptionResponse
+from src.schemas.billing.responses import (
+    CheckoutResponse,
+    PortalResponse,
+    SubscriptionResponse,
+)
 from src.services.billing.interface import BaseBillingService
 from src.utils.logging import get_logger
 
@@ -28,9 +31,15 @@ log = get_logger(__name__)
 
 def _build_price_map() -> dict[tuple[Plan, BillingPeriod], str]:
     return {
-        (Plan.PRO, BillingPeriod.MONTHLY): external_settings.STRIPE_PRO_MONTHLY_PRICE_ID,
+        (
+            Plan.PRO,
+            BillingPeriod.MONTHLY,
+        ): external_settings.STRIPE_PRO_MONTHLY_PRICE_ID,
         (Plan.PRO, BillingPeriod.YEARLY): external_settings.STRIPE_PRO_YEARLY_PRICE_ID,
-        (Plan.MAX, BillingPeriod.MONTHLY): external_settings.STRIPE_MAX_MONTHLY_PRICE_ID,
+        (
+            Plan.MAX,
+            BillingPeriod.MONTHLY,
+        ): external_settings.STRIPE_MAX_MONTHLY_PRICE_ID,
         (Plan.MAX, BillingPeriod.YEARLY): external_settings.STRIPE_MAX_YEARLY_PRICE_ID,
     }
 
@@ -77,7 +86,9 @@ class StripeBillingService(BaseBillingService):
         if customer_id:
             params["customer"] = customer_id
 
-        session = await anyio.to_thread.run_sync(lambda: stripe.checkout.Session.create(**params))
+        session = await anyio.to_thread.run_sync(
+            lambda: stripe.checkout.Session.create(**params)
+        )
         return session.url, session.customer  # type: ignore[return-value]
 
     async def create_portal_session(self, customer_id: str, return_url: str) -> str:
@@ -107,7 +118,9 @@ class StripeBillingService(BaseBillingService):
             price_id (str): New Stripe price ID for the target plan/period.
 
         """
-        raw_sub = await anyio.to_thread.run_sync(lambda: stripe.Subscription.retrieve(stripe_sub_id))
+        raw_sub = await anyio.to_thread.run_sync(
+            lambda: stripe.Subscription.retrieve(stripe_sub_id)
+        )
         item_id: str = raw_sub["items"]["data"][0]["id"]
         await anyio.to_thread.run_sync(
             lambda: stripe.Subscription.modify(
@@ -144,7 +157,9 @@ class StripeBillingService(BaseBillingService):
 
         """
         try:
-            event = stripe.Webhook.construct_event(payload, sig_header, self._webhook_secret)
+            event = stripe.Webhook.construct_event(
+                payload, sig_header, self._webhook_secret
+            )
         except stripe.SignatureVerificationError as exc:
             raise ValueError("Invalid Stripe webhook signature") from exc
         return event.to_dict()
@@ -232,16 +247,20 @@ class BillingOrchestrator:
         price_map = _build_price_map()
         price_id = price_map.get((plan, period))
         if not price_id:
-            raise ValueError(f"No Stripe price ID configured for plan={plan.value} period={period.value}")
+            raise ValueError(
+                f"No Stripe price ID configured for plan={plan.value} period={period.value}"
+            )
 
-        checkout_url, stripe_customer_id = await self.billing_svc.create_checkout_session(
+        (
+            checkout_url,
+            stripe_customer_id,
+        ) = await self.billing_svc.create_checkout_session(
             customer_id=org.stripe_customer_id,
             price_id=price_id,
             org_id=str(org_id),
             success_url=success_url,
             cancel_url=cancel_url,
         )
-
 
         if not org.stripe_customer_id and stripe_customer_id:
             await self.org_repo.update(org, stripe_customer_id=stripe_customer_id)
@@ -282,9 +301,16 @@ class BillingOrchestrator:
         sub = await self.subscription_repo.get_by_org(org_id)
         if not sub or not sub.stripe_subscription_id:
             # No active paid sub — caller should use create_checkout instead
-            raise ForbiddenError("No active subscription to upgrade — use checkout to start one")
+            raise ForbiddenError(
+                "No active subscription to upgrade — use checkout to start one"
+            )
 
-        _PLAN_ORDER: dict[Plan, int] = {Plan.FREE: 0, Plan.PRO: 1, Plan.MAX: 2, Plan.ENTERPRISE: 3}
+        _PLAN_ORDER: dict[Plan, int] = {
+            Plan.FREE: 0,
+            Plan.PRO: 1,
+            Plan.MAX: 2,
+            Plan.ENTERPRISE: 3,
+        }
         if _PLAN_ORDER.get(plan, 0) <= _PLAN_ORDER.get(sub.plan, 0):
             # Same tier or downgrade — must go through the Stripe portal
             raise ConflictError("Subscription", "plan", plan.value)
@@ -422,7 +448,9 @@ class BillingOrchestrator:
         if not sub:
             return
 
-        raw_sub = await anyio.to_thread.run_sync(lambda: stripe.Subscription.retrieve(stripe_sub_id))
+        raw_sub = await anyio.to_thread.run_sync(
+            lambda: stripe.Subscription.retrieve(stripe_sub_id)
+        )
         stripe_sub: dict = raw_sub.to_dict()
         item = stripe_sub["items"]["data"][0]
         price_id: str = item["price"]["id"]

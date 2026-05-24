@@ -56,9 +56,7 @@ class FeatureFlagService:
 
     # NOTE: evaluate() is intentionally not exposed as a REST endpoint.
     # The product layer calls it directly via dependency injection.
-    async def evaluate(
-        self, org_id: uuid.UUID, user_id: uuid.UUID, key: str
-    ) -> bool:
+    async def evaluate(self, org_id: uuid.UUID, user_id: uuid.UUID, key: str) -> bool:
         """Evaluate a single flag for an org.
 
         Returns False if the flag does not exist — always conservative.

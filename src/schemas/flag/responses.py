@@ -21,4 +21,6 @@ class FeatureFlagResponse(BaseModel):
     org_id: uuid.UUID = Field(description="Org this flag belongs to.")
     key: str = Field(description="Snake_case identifier e.g. 'new_billing_ui'.")
     enabled: bool = Field(description="Current on/off state of the flag.")
-    description: Optional[str] = Field(description="Optional human-readable note about the flag's purpose.")
+    description: Optional[str] = Field(
+        description="Optional human-readable note about the flag's purpose."
+    )
