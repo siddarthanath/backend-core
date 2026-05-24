@@ -5,10 +5,10 @@
 # Standard Library
 import uuid
 
-# Third Party
+# Third-Party Library
 from fastapi import APIRouter, Request
 
-# Internal
+# Private Library
 from src.core.dependencies import CurrentUserID, OrgSvc
 from src.core.middleware.rate_limit import limiter
 from src.schemas.common import MessageResponse

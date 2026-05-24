@@ -5,10 +5,10 @@
 # Standard Library
 import uuid
 
-# Third Party
+# Third-Party Library
 from fastapi import APIRouter, Request
 
-# Internal
+# Private Library
 from src.core.dependencies import ApiKeySvc, AuditSvc, CurrentUserID
 from src.core.middleware.rate_limit import limiter
 from src.schemas.api_key.requests import CreateApiKeyRequest

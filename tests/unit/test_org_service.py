@@ -1,4 +1,4 @@
-﻿"""Unit tests for OrgService — no database, all repositories mocked."""
+"""Unit tests for OrgService — no database, all repositories mocked."""
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
@@ -6,10 +6,10 @@
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 
-# Third Party
+# Third-Party Library
 import pytest
 
-# Internal
+# Private Library
 from src.constants import MembershipStatus, Role
 from src.core.exceptions.types import ConflictError, ForbiddenError, NotFoundError
 from src.repositories.org import MembershipRepository, OrgRepository

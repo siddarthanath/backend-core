@@ -2,7 +2,7 @@
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
-# Third Party
+# Third-Party Library
 import pytest
 from httpx import AsyncClient
 

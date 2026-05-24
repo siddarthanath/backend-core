@@ -6,11 +6,11 @@
 import uuid
 from unittest.mock import patch
 
-# Third Party
+# Third-Party Library
 import pytest
 from httpx import AsyncClient
 
-# Internal
+# Private Library
 from src.schemas.auth import UserClaims
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #

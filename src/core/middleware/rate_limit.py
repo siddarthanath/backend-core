@@ -1,4 +1,4 @@
-﻿"""Rate limiting — global slowapi limiter, default 60 req/min per IP."""
+"""Rate limiting — global slowapi limiter, default 60 req/min per IP."""
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 

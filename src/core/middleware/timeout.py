@@ -5,12 +5,12 @@
 # Standard Library
 import asyncio
 
-# Third Party
+# Third-Party Library
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-# Internal
+# Private Library
 from src.configs.settings import app_settings
 from src.core.exceptions.envelope import ErrorEnvelope
 from src.utils.logging import get_logger

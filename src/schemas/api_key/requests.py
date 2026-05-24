@@ -6,7 +6,7 @@
 from datetime import datetime
 from typing import Optional
 
-# Third Party
+# Third-Party Library
 from pydantic import BaseModel, Field
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #

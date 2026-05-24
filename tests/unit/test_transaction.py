@@ -5,10 +5,10 @@
 # Standard Library
 from unittest.mock import AsyncMock, call
 
-# Third Party
+# Third-Party Library
 import pytest
 
-# Internal
+# Private Library
 from src.services.sessions.database import transaction
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #

@@ -6,10 +6,10 @@
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 
-# Third Party
+# Third-Party Library
 import pytest
 
-# Internal
+# Private Library
 from src.core.exceptions.types import ForbiddenError, NotFoundError
 from src.repositories.flag import FlagRepository
 from src.repositories.org import MembershipRepository, OrgRepository

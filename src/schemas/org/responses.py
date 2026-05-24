@@ -7,10 +7,10 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-# Third Party
+# Third-Party Library
 from pydantic import BaseModel, ConfigDict
 
-# Internal
+# Private Library
 from src.constants import MembershipStatus, Role
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #

@@ -6,10 +6,10 @@
 import uuid
 from typing import Optional
 
-# Third Party
+# Third-Party Library
 from sqlalchemy import select
 
-# Internal
+# Private Library
 from src.models.flag import FeatureFlag
 from src.repositories.base import BaseRepository
 

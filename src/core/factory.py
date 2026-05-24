@@ -6,10 +6,10 @@
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
 
-# Third Party
+# Third-Party Library
 from fastapi import FastAPI
 
-# Internal
+# Private Library
 from src.api.router import router
 from src.configs.settings import app_settings
 from src.core.exceptions import add_exception_handlers

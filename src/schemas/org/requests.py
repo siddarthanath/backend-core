@@ -5,10 +5,10 @@
 # Standard Library
 import re
 
-# Third Party
+# Third-Party Library
 from pydantic import BaseModel, EmailStr, field_validator
 
-# Internal
+# Private Library
 from src.constants import Role
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #

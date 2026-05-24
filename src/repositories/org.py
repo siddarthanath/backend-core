@@ -5,10 +5,10 @@
 # Standard Library
 import uuid
 
-# Third Party
+# Third-Party Library
 from sqlalchemy import and_, func, select
 
-# Internal
+# Private Library
 from src.constants import MembershipStatus, Role
 from src.models.org import Membership, Organisation
 from src.models.user import UserProfile

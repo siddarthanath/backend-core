@@ -6,10 +6,10 @@
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
-# Third Party
+# Third-Party Library
 import pytest
 
-# Internal
+# Private Library
 from src.constants import BillingPeriod, Plan, Role, SubscriptionStatus
 from src.core.exceptions.types import ConflictError, ForbiddenError, NotFoundError
 from src.repositories.billing import SubscriptionRepository

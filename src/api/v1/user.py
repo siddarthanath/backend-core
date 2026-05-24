@@ -1,4 +1,4 @@
-﻿"""User endpoints — profile management and account operations."""
+"""User endpoints — profile management and account operations."""
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 

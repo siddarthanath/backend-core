@@ -6,10 +6,10 @@
 import uuid
 from typing import Optional
 
-# Third Party
+# Third-Party Library
 from sqlalchemy import select
 
-# Internal
+# Private Library
 from src.models.api_key import ApiKey
 from src.repositories.base import BaseRepository
 

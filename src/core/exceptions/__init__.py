@@ -2,7 +2,7 @@
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
-# Internal
+# Private Library
 from src.core.exceptions.base import CoreException
 from src.core.exceptions.envelope import ErrorEnvelope
 from src.core.exceptions.handlers import add_exception_handlers

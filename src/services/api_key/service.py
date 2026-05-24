@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-# Internal
+# Private Library
 from src.constants import Role
 from src.core.exceptions.types import ForbiddenError, NotFoundError
 from src.models.api_key import ApiKey

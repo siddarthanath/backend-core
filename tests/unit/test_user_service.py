@@ -7,10 +7,10 @@ import uuid
 from dataclasses import dataclass
 from unittest.mock import AsyncMock, MagicMock
 
-# Third Party
+# Third-Party Library
 import pytest
 
-# Internal
+# Private Library
 from src.core.exceptions.types import NotFoundError
 from src.repositories.user import UserRepository
 from src.services.user.service import UserService

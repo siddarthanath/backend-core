@@ -2,12 +2,12 @@
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
-# Third Party
+# Third-Party Library
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-# Internal
+# Private Library
 from src.core.exceptions.base import CoreException
 from src.core.exceptions.envelope import ErrorEnvelope
 from src.utils.logging import get_logger

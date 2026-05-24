@@ -5,7 +5,7 @@
 # Standard Library
 import logging
 
-# Third Party
+# Third-Party Library
 import structlog
 from structlog.types import Processor
 

@@ -5,13 +5,13 @@
 # Standard Library
 import uuid
 
-# Third Party
+# Third-Party Library
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Internal
+# Private Library
 from src.core.dependencies.auth import get_current_user
 from src.main import app
 from src.models.org import Organisation

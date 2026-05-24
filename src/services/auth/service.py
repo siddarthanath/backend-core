@@ -9,11 +9,11 @@ This service handles server-initiated operations only: delete, email update, pas
 # Standard Library
 import uuid
 
-# Third Party
+# Third-Party Library
 import anyio
 import anyio.to_thread
 
-# Internal
+# Private Library
 from src.core.exceptions.types import ExternalServiceError
 from src.utils.auth import get_supabase_admin_client
 from src.utils.logging import get_logger

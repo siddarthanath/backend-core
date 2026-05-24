@@ -6,11 +6,11 @@
 import uuid
 from typing import Annotated, TypeAlias
 
-# Third Party
+# Third-Party Library
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Internal
+# Private Library
 from src.core.dependencies.auth import get_current_user
 from src.core.dependencies.database import get_db
 from src.repositories.billing import SubscriptionRepository

@@ -5,11 +5,11 @@
 # Standard Library
 import uuid
 
-# Third Party
+# Third-Party Library
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 
-# Internal
+# Private Library
 from src.constants import Plan, SubscriptionStatus
 from src.models.billing import Subscription
 from src.repositories.base import BaseRepository

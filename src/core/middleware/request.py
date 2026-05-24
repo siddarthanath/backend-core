@@ -6,13 +6,13 @@
 import time
 import uuid
 
-# Third Party
+# Third-Party Library
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 from structlog.contextvars import bind_contextvars, clear_contextvars
 
-# Internal
+# Private Library
 from src.core.context import set_request_id
 from src.utils.logging import get_logger
 

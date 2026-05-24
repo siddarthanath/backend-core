@@ -7,10 +7,10 @@ import json
 import urllib.error
 import urllib.request
 
-# Third Party
+# Third-Party Library
 import anyio
 
-# Internal
+# Private Library
 from src.configs.settings import external_settings
 from src.utils.logging import get_logger
 

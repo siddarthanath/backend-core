@@ -1,4 +1,4 @@
-﻿"""UserService — profile lifecycle: create, read, update, soft-delete."""
+"""UserService — profile lifecycle: create, read, update, soft-delete."""
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 

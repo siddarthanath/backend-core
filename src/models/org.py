@@ -6,12 +6,12 @@
 import uuid
 from typing import Optional
 
-# Third Party
+# Third-Party Library
 import sqlalchemy as sa
 from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, SQLModel
 
-# Internal
+# Private Library
 from src.constants import MembershipStatus, Role
 from src.models.base import SoftDeleteMixin, TimestampMixin, UUIDMixin
 

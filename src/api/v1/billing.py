@@ -5,10 +5,10 @@
 # Standard Library
 import uuid
 
-# Third Party
+# Third-Party Library
 from fastapi import APIRouter, Header, Request
 
-# Internal
+# Private Library
 from src.core.dependencies import BillingSvc, CurrentUserID
 from src.core.middleware.rate_limit import limiter
 from src.schemas.billing.requests import (

@@ -6,7 +6,7 @@
 import uuid
 from typing import Optional
 
-# Internal
+# Private Library
 from src.constants import Role
 from src.core.exceptions.types import ForbiddenError, NotFoundError
 from src.models.flag import FeatureFlag

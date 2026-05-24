@@ -5,7 +5,7 @@
 # Standard Library
 from datetime import datetime
 
-# Third Party
+# Third-Party Library
 from pydantic import BaseModel
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #

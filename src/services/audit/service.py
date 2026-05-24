@@ -6,7 +6,7 @@
 import uuid
 from typing import Optional
 
-# Internal
+# Private Library
 from src.core.exceptions.types import ForbiddenError, NotFoundError
 from src.models.audit import AuditLog
 from src.repositories.audit import AuditRepository

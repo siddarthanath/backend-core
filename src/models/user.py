@@ -5,10 +5,10 @@
 # Standard Library
 import uuid
 
-# Third Party
+# Third-Party Library
 from sqlmodel import Field, SQLModel
 
-# Internal
+# Private Library
 from src.models.base import SoftDeleteMixin, TimestampMixin
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #

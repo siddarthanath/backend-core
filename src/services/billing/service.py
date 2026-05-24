@@ -6,11 +6,11 @@
 import uuid
 from datetime import datetime, timezone
 
-# Third Party
+# Third-Party Library
 import anyio.to_thread
 import stripe
 
-# Internal
+# Private Library
 from src.configs.settings import external_settings
 from src.constants import BillingPeriod, Plan, Role, SubscriptionStatus
 from src.core.exceptions.types import ConflictError, ForbiddenError, NotFoundError

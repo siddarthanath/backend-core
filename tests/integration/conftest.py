@@ -5,7 +5,7 @@
 # Standard Library
 import os
 
-# Third Party
+# Third-Party Library
 import pytest
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #

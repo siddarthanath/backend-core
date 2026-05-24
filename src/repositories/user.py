@@ -5,11 +5,11 @@
 # Standard Library
 import uuid
 
-# Third Party
+# Third-Party Library
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-# Internal
+# Private Library
 from src.models.user import UserProfile
 from src.repositories.base import BaseRepository
 

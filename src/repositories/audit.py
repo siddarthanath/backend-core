@@ -5,10 +5,10 @@
 # Standard Library
 import uuid
 
-# Third Party
+# Third-Party Library
 from sqlalchemy import select
 
-# Internal
+# Private Library
 from src.models.audit import AuditLog
 from src.repositories.base import BaseRepository
 

@@ -7,11 +7,11 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-# Third Party
+# Third-Party Library
 import sqlalchemy as sa
 from sqlmodel import Field, SQLModel
 
-# Internal
+# Private Library
 from src.constants import Plan, SubscriptionStatus
 from src.models.base import TimestampMixin, UUIDMixin
 

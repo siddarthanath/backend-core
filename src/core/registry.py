@@ -6,7 +6,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Dict, Generic, TypeVar
 
-# Internal
+# Private Library
 from src.utils.logging import get_logger
 
 if TYPE_CHECKING:

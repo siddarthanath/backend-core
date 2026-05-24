@@ -7,10 +7,10 @@ import uuid
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
-# Third Party
+# Third-Party Library
 import pytest
 
-# Internal
+# Private Library
 from src.core.exceptions.types import ForbiddenError, NotFoundError
 from src.repositories.audit import AuditRepository
 from src.repositories.org import MembershipRepository, OrgRepository

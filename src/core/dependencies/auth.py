@@ -2,14 +2,14 @@
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
-# Third Party
+# Third-Party Library
 import jwt
 from jwt import PyJWKClient
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from structlog.contextvars import bind_contextvars
 
-# Internal
+# Private Library
 from src.configs.settings import auth_settings
 from src.core.context import set_request_user_id
 from src.core.exceptions.types import AuthException

@@ -1,6 +1,6 @@
 """Models package — imports all SQLModel table classes so Alembic can discover them."""
 
-# Internal
+# Private Library
 from src.models.api_key import ApiKey
 from src.models.audit import AuditLog
 from src.models.billing import Subscription

@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-# Third Party
+# Third-Party Library
 import sqlalchemy as sa
 from sqlmodel import Field, SQLModel
 

@@ -5,12 +5,12 @@
 # Standard Library
 from datetime import datetime, timezone
 
-# Third Party
+# Third-Party Library
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Internal
+# Private Library
 from src.configs.settings import app_settings
 from src.core.dependencies.database import get_db
 from src.schemas.health import HealthResponse, ReadyResponse

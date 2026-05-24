@@ -2,10 +2,10 @@
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
-# Third Party
+# Third-Party Library
 from pydantic import BaseModel, HttpUrl
 
-# Internal
+# Private Library
 from src.constants import BillingPeriod, Plan
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #

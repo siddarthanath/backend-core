@@ -1,4 +1,4 @@
-﻿"""App-level settings — name, version, CORS, timeouts."""
+"""App-level settings — name, version, CORS, timeouts."""
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 

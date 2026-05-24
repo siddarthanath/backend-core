@@ -6,10 +6,10 @@
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-# Third Party
+# Third-Party Library
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
-# Internal
+# Private Library
 from src.configs.settings import database_settings
 from src.utils.logging import get_logger
 

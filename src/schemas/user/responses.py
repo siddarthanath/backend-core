@@ -6,10 +6,10 @@
 import uuid
 from datetime import datetime
 
-# Third Party
+# Third-Party Library
 from pydantic import BaseModel, ConfigDict
 
-# Internal
+# Private Library
 from src.constants import Plan
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #

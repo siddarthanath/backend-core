@@ -5,7 +5,7 @@
 # Standard Library
 from typing import Generic, TypeVar
 
-# Third Party
+# Third-Party Library
 from pydantic import BaseModel
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #

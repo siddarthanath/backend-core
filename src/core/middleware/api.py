@@ -5,12 +5,12 @@
 # Standard Library
 import logging
 
-# Third Party
+# Third-Party Library
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response, StreamingResponse
 
-# Internal
+# Private Library
 from src.utils.logging import get_logger
 from src.utils.middleware import MAX_BODY_LOG_BYTES, _decode_body
 

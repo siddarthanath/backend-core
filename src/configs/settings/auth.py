@@ -2,7 +2,7 @@
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
-# Third Party
+# Third-Party Library
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
