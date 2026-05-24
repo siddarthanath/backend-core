@@ -414,14 +414,23 @@ class BillingOrchestrator:
 
         log.info("billing.webhook_received", event_type=event_type)
 
-        if event_type == "checkout.session.completed":
-            await self._on_checkout_completed(data)
-        elif event_type == "customer.subscription.updated":
-            await self._on_subscription_updated(data)
-        elif event_type == "customer.subscription.deleted":
-            await self._on_subscription_deleted(data)
-        elif event_type == "invoice.payment_failed":
-            await self._on_payment_failed(data)
+        try:
+            if event_type == "checkout.session.completed":
+                await self._on_checkout_completed(data)
+            elif event_type == "customer.subscription.updated":
+                await self._on_subscription_updated(data)
+            elif event_type == "customer.subscription.deleted":
+                await self._on_subscription_deleted(data)
+            elif event_type == "invoice.payment_failed":
+                await self._on_payment_failed(data)
+        except ValueError as exc:
+            # Unknown price ID — log and return 200 so Stripe does not retry indefinitely.
+            # Retrying cannot resolve a misconfigured price ID; it only floods the logs.
+            log.warning(
+                "billing.webhook_unresolvable",
+                event_type=event_type,
+                error=str(exc),
+            )
 
     async def _on_checkout_completed(self, data: dict) -> None:
         org_id_str: str = data.get("metadata", {}).get("org_id", "")

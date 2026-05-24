@@ -8,12 +8,18 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 # Third-Party Library
 import pytest
+from pydantic import ValidationError
 
 # Private Library
 from src.constants import BillingPeriod, Plan, SubscriptionStatus
 from src.core.exceptions.types import ConflictError, ForbiddenError, NotFoundError
 from src.repositories.billing import SubscriptionRepository
 from src.repositories.org import MembershipRepository, OrgRepository
+from src.schemas.billing.requests import (
+    CancelSubscriptionRequest,
+    CreateCheckoutRequest,
+    CreatePortalRequest,
+)
 from src.services.billing.interface import BaseBillingService
 from src.services.billing.service import BillingOrchestrator
 
@@ -78,6 +84,43 @@ def make_stripe_subscription_dict(
             ]
         },
     }
+
+
+class TestBillingRequestSchemas:
+    @pytest.mark.unit
+    def test_checkout_rejects_external_success_url(self) -> None:
+        with pytest.raises(ValidationError, match="URL must be on"):
+            CreateCheckoutRequest(
+                plan="pro",
+                period="monthly",
+                success_url="https://evil.com/steal",
+                cancel_url="http://localhost:3000/cancel",
+            )
+
+    @pytest.mark.unit
+    def test_checkout_rejects_external_cancel_url(self) -> None:
+        with pytest.raises(ValidationError, match="URL must be on"):
+            CreateCheckoutRequest(
+                plan="pro",
+                period="monthly",
+                success_url="http://localhost:3000/success",
+                cancel_url="https://evil.com/steal",
+            )
+
+    @pytest.mark.unit
+    def test_portal_rejects_external_return_url(self) -> None:
+        with pytest.raises(ValidationError, match="URL must be on"):
+            CreatePortalRequest(return_url="https://evil.com/steal")
+
+    @pytest.mark.unit
+    def test_cancel_rejects_reason_over_500_chars(self) -> None:
+        with pytest.raises(ValidationError):
+            CancelSubscriptionRequest(reason="x" * 501)
+
+    @pytest.mark.unit
+    def test_cancel_accepts_reason_at_500_chars(self) -> None:
+        req = CancelSubscriptionRequest(reason="x" * 500)
+        assert req.reason is not None and len(req.reason) == 500
 
 
 class TestGetSubscription:
@@ -544,5 +587,40 @@ class TestHandleWebhook:
         }
 
         await orchestrator.handle_webhook(b"payload", "sig")
+
+        subscription_repo.update.assert_not_awaited()
+
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_unknown_price_id_does_not_raise_or_retry(self) -> None:
+        # If _plan_from_price raises ValueError (misconfigured price ID), the webhook
+        # must return cleanly — not propagate the error and trigger infinite Stripe retries.
+        orchestrator, subscription_repo, org_repo, _, billing_svc = make_orchestrator()
+        org_id = uuid.uuid4()
+        org = make_org(id=org_id)
+        sub = make_subscription(org_id=org_id)
+
+        billing_svc.parse_webhook.return_value = {
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "metadata": {"org_id": str(org_id)},
+                    "subscription": "sub_test123",
+                    "customer": "cus_test123",
+                }
+            },
+        }
+        org_repo.get_by_id.return_value = org
+        subscription_repo.get_by_org.return_value = sub
+
+        stripe_sub_dict = make_stripe_subscription_dict(price_id="price_unknown_id")
+        with patch("src.services.billing.service._build_price_map", return_value={}):
+            with patch(
+                "anyio.to_thread.run_sync",
+                new_callable=AsyncMock,
+                return_value=MagicMock(to_dict=lambda: stripe_sub_dict),
+            ):
+                # Must not raise — Stripe would retry on any non-200 response.
+                await orchestrator.handle_webhook(b"payload", "sig")
 
         subscription_repo.update.assert_not_awaited()

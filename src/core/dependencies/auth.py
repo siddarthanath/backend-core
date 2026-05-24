@@ -49,7 +49,9 @@ async def get_current_user(
         payload = jwt.decode(
             credentials.credentials,
             signing_key.key,
-            algorithms=["ES256", "RS256", "HS256"],
+            # HS256 excluded — algorithm confusion attack: attacker signs a forged token
+            # with the public JWKS key used as an HS256 secret; server validates it as valid.
+            algorithms=["ES256", "RS256"],
             audience="authenticated",
             issuer=f"{auth_settings.SUPABASE_URL}/auth/v1",
             leeway=10,
