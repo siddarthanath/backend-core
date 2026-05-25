@@ -6,11 +6,11 @@
 import uuid
 from typing import Optional
 
-# Third Party
+# Third-Party Library
 import sqlalchemy as sa
 from sqlmodel import Field, SQLModel
 
-# Internal
+# Private Library
 from src.models.base import TimestampMixin, UUIDMixin
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #

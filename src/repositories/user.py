@@ -5,11 +5,11 @@
 # Standard Library
 import uuid
 
-# Third Party
+# Third-Party Library
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-# Internal
+# Private Library
 from src.models.user import UserProfile
 from src.repositories.base import BaseRepository
 
@@ -56,7 +56,7 @@ class UserRepository(BaseRepository[UserProfile]):
         """
         # INSERT ... ON CONFLICT DO NOTHING is atomic — eliminates the race condition where two
         # concurrent first requests for the same user both see no row and both attempt to insert.
-        values: dict = {"id": user_id, "email": email}
+        values: dict[str, object] = {"id": user_id, "email": email}
         if first_name is not None:
             values["first_name"] = first_name
         if last_name is not None:

@@ -4,9 +4,8 @@
 
 # Standard Library
 import uuid
-from typing import Optional
 
-# Internal
+# Private Library
 from src.core.exceptions.types import ForbiddenError, NotFoundError
 from src.models.audit import AuditLog
 from src.repositories.audit import AuditRepository
@@ -37,9 +36,9 @@ class AuditService:
         org_id: uuid.UUID,
         action: str,
         resource_type: str,
-        actor_id: Optional[uuid.UUID] = None,
-        resource_id: Optional[str] = None,
-        metadata: Optional[dict[str, object]] = None,
+        actor_id: uuid.UUID | None = None,
+        resource_id: str | None = None,
+        metadata: dict[str, object] | None = None,
     ) -> AuditLogResponse:
         """Append an audit event for an org.
 
@@ -94,6 +93,7 @@ class AuditService:
         if not org:
             raise NotFoundError("Organisation", org_id)
         from src.constants import Role
+
         if not await self.membership_repo.user_has_role(user_id, org_id, Role.ADMIN):
             raise ForbiddenError("Only admins can view the audit log")
 

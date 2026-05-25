@@ -1,8 +1,10 @@
-﻿"""Rate limiting — global slowapi limiter, default 60 req/min per IP."""
+"""Rate limiting — global slowapi limiter, default 60 req/min per user/IP."""
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
 # Third-Party Library
+import jwt as pyjwt
+from fastapi import Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -11,11 +13,33 @@ from src.configs.settings import app_settings
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
-# Module-level limiter — registered on app.state in add_middleware(), used via @limiter.limit() decorator.
-# key_func=get_remote_address limits by IP. This stops accidental hammering and simple bots but can be
-# bypassed by IP rotation. For authenticated routes in the product layer, replace get_remote_address with
-# a function that extracts the user ID from the JWT — that ties the limit to the account, not the IP.
+
+def get_rate_limit_key(request: Request) -> str:
+    """Key authenticated requests by user ID, unauthenticated requests by IP.
+
+    Decoding without signature verification is intentional — we are bucketing
+    traffic, not authorising it. Real auth and verification happens in
+    get_current_user. If the token is forged, get_current_user rejects it;
+    the rate limit bucket is irrelevant at that point.
+    """
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth.removeprefix("Bearer ")
+        try:
+            payload = pyjwt.decode(
+                token,
+                options={"verify_signature": False},
+                algorithms=["ES256", "RS256"],
+            )
+            sub = payload.get("sub")
+            if sub:
+                return f"user:{sub}"
+        except Exception:
+            pass
+    return get_remote_address(request)
+
+
 limiter = Limiter(
-    key_func=get_remote_address,
+    key_func=get_rate_limit_key,
     default_limits=[app_settings.RATE_LIMIT_DEFAULT],
 )

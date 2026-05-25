@@ -1,4 +1,4 @@
-﻿"""UserService — profile lifecycle: create, read, update, soft-delete."""
+"""UserService — profile lifecycle: create, read, update, soft-delete."""
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
@@ -9,7 +9,6 @@ import uuid
 from src.core.exceptions.types import NotFoundError
 from src.models.user import UserProfile
 from src.repositories.user import UserRepository
-
 
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #

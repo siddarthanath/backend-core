@@ -2,7 +2,7 @@
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
-# Third Party
+# Third-Party Library
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -12,7 +12,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class AuthSettings(BaseSettings):
     """Supabase project credentials for JWT verification."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
     SUPABASE_URL: str
     SUPABASE_JWT_SECRET: str = ""  # unused for ES256 — JWKS endpoint used instead

@@ -2,10 +2,10 @@
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
-# Third Party
+# Third-Party Library
 from pydantic import BaseModel
 
-# Internal
+# Private Library
 from src.core.context import get_request_id
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #

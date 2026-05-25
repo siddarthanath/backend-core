@@ -5,10 +5,10 @@
 # Standard Library
 import uuid
 
-# Third Party
+# Third-Party Library
 from fastapi import APIRouter, Request
 
-# Internal
+# Private Library
 from src.core.dependencies import CurrentUserID, OrgSvc
 from src.core.middleware.rate_limit import limiter
 from src.schemas.common import MessageResponse
@@ -148,5 +148,7 @@ async def remove_member(
     service: OrgSvc,
 ) -> MessageResponse:
     """Remove a member from the org. Requires admin or owner role."""
-    await service.remove_member(org_id, requester_id=user_id, target_user_id=target_user_id)
+    await service.remove_member(
+        org_id, requester_id=user_id, target_user_id=target_user_id
+    )
     return MessageResponse(message="Member removed.")

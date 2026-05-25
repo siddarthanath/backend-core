@@ -5,10 +5,10 @@
 # Standard Library
 from collections.abc import AsyncGenerator
 
-# Third Party
+# Third-Party Library
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Internal
+# Private Library
 from src.core.registry import db_registry
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #

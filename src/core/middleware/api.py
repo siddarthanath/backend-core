@@ -5,12 +5,12 @@
 # Standard Library
 import logging
 
-# Third Party
+# Third-Party Library
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response, StreamingResponse
 
-# Internal
+# Private Library
 from src.utils.logging import get_logger
 from src.utils.middleware import MAX_BODY_LOG_BYTES, _decode_body
 
@@ -46,10 +46,15 @@ class APILoggingMiddleware(BaseHTTPMiddleware):
                     log.debug("request.body", body=_decode_body(request_body))
 
                 async def receive() -> dict[str, object]:
-                    return {"type": "http.request", "body": request_body, "more_body": False}
+                    return {
+                        "type": "http.request",
+                        "body": request_body,
+                        "more_body": False,
+                    }
 
+                # NOTE: _receive is an internal Starlette attribute — check after Starlette upgrades.
                 request._receive = receive  # type: ignore[method-assign]
-            except Exception:
+            except Exception:  # Body logging is best-effort; never block the request
                 log.exception("request.body_logging_failed")
 
         response = await call_next(request)  # type: ignore[misc]
@@ -57,7 +62,12 @@ class APILoggingMiddleware(BaseHTTPMiddleware):
         content_type = response.headers.get("content-type", "")
         is_json = "application/json" in content_type
 
-        if not debug_enabled or not is_json or isinstance(response, StreamingResponse) or path in STREAMING_PATHS:
+        if (
+            not debug_enabled
+            or not is_json
+            or isinstance(response, StreamingResponse)
+            or path in STREAMING_PATHS
+        ):
             return response
 
         try:
@@ -79,6 +89,8 @@ class APILoggingMiddleware(BaseHTTPMiddleware):
                 headers=dict(response.headers),
                 media_type=response.media_type,
             )
-        except Exception:
+        except (
+            Exception
+        ):  # Body logging is best-effort; serve the plain response on failure
             log.exception("response.body_logging_failed")
             return response

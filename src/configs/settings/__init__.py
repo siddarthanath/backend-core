@@ -2,7 +2,7 @@
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
-# Internal
+# Private Library
 from .auth import AuthSettings
 from .base import AppSettings
 from .database import DatabaseSettings

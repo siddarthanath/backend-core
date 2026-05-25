@@ -1,4 +1,4 @@
-﻿"""User endpoints — profile management and account operations."""
+"""User endpoints — profile management and account operations."""
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
@@ -9,7 +9,13 @@ import uuid
 from fastapi import APIRouter, Request
 
 # Private Library
-from src.core.dependencies import AuthSvc, CurrentUserClaims, CurrentUserID, OrgSvc, UserSvc
+from src.core.dependencies import (
+    AuthSvc,
+    CurrentUserClaims,
+    CurrentUserID,
+    OrgSvc,
+    UserSvc,
+)
 from src.core.middleware.rate_limit import limiter
 from src.schemas.common import MessageResponse
 from src.schemas.user.requests import (
@@ -43,7 +49,9 @@ async def get_me(
 
     """
     user_id = uuid.UUID(claims.sub)
-    user = await service.get_or_create(user_id, email=claims.email, full_name=claims.full_name)
+    user = await service.get_or_create(
+        user_id, email=claims.email, full_name=claims.full_name
+    )
     await org_service.get_or_create_personal(user_id, email=claims.email)
     orgs = await org_service.list_my_orgs(user_id)
     personal_org = next((o for o in orgs if o.is_personal), None)
@@ -89,6 +97,7 @@ async def update_profile(
 
 @router.post("/reset-password", response_model=MessageResponse)
 @limiter.limit("5/minute")
+# Intentionally unauthenticated — caller doesn't have a token yet (forgot password flow)
 async def request_password_reset(
     request: Request,
     body: RequestPasswordResetRequest,

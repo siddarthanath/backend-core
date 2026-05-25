@@ -2,12 +2,12 @@
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
-# Third Party
+# Third-Party Library
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-# Internal
+# Private Library
 from src.core.exceptions.base import CoreException
 from src.core.exceptions.envelope import ErrorEnvelope
 from src.utils.logging import get_logger
@@ -18,11 +18,15 @@ log = get_logger(__name__)
 
 
 async def _core_exception_handler(request: Request, exc: CoreException) -> JSONResponse:
-    envelope = ErrorEnvelope.from_exception(code=exc.code, message=exc.message, detail=exc.detail)
+    envelope = ErrorEnvelope.from_exception(
+        code=exc.code, message=exc.message, detail=exc.detail
+    )
     return JSONResponse(status_code=exc.status_code, content=envelope.model_dump())
 
 
-async def _validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+async def _validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
     envelope = ErrorEnvelope.from_exception(
         code="VALIDATION_ERROR",
         message="Request validation failed",
@@ -31,7 +35,9 @@ async def _validation_exception_handler(request: Request, exc: RequestValidation
     return JSONResponse(status_code=422, content=envelope.model_dump())
 
 
-async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+async def _unhandled_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
     log.error("request.unhandled_exception", error=str(exc), exc_info=True)
     envelope = ErrorEnvelope.from_exception(
         code="INTERNAL_ERROR",

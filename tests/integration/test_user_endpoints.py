@@ -6,11 +6,11 @@
 import uuid
 from unittest.mock import patch
 
-# Third Party
+# Third-Party Library
 import pytest
 from httpx import AsyncClient
 
-# Internal
+# Private Library
 from src.schemas.auth import UserClaims
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
@@ -71,7 +71,9 @@ class TestUpdateProfile:
         finally:
             app.dependency_overrides.clear()
 
-    async def test_partial_update_preserves_existing_fields(self, client: AsyncClient) -> None:
+    async def test_partial_update_preserves_existing_fields(
+        self, client: AsyncClient
+    ) -> None:
         from src.core.dependencies.auth import get_current_user
         from src.main import app
 
@@ -94,8 +96,12 @@ class TestUpdateProfile:
 
 @pytest.mark.integration
 class TestPasswordReset:
-    async def test_always_returns_200_regardless_of_email(self, client: AsyncClient) -> None:
-        with patch("src.services.auth.service.get_supabase_admin_client") as mock_client:
+    async def test_always_returns_200_regardless_of_email(
+        self, client: AsyncClient
+    ) -> None:
+        with patch(
+            "src.services.auth.service.get_supabase_admin_client"
+        ) as mock_client:
             mock_client.return_value.auth.admin.generate_link.return_value = {}
             response = await client.post(
                 "/api/v1/user/reset-password",

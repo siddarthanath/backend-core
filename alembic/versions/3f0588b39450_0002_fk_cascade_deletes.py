@@ -1,4 +1,4 @@
-"""0002_fk_cascade_deletes
+"""0002_fk_cascade_and_triggers
 
 Revision ID: 0002
 Revises: 3f0588b39450
@@ -51,7 +51,36 @@ def upgrade() -> None:
     )
 
 
+    # Email sync trigger — keeps user_profiles.email in sync with auth.users.email
+    # automatically after Supabase confirms an email change. No application code required.
+    op.execute("""
+        create or replace function sync_user_email()
+        returns trigger
+        language plpgsql
+        security definer
+        set search_path = public
+        as $$
+        begin
+            update user_profiles
+            set email = new.email
+            where id = new.id;
+            return new;
+        end;
+        $$;
+    """)
+    op.execute("""
+        create trigger on_auth_email_change
+        after update of email on auth.users
+        for each row
+        when (old.email is distinct from new.email)
+        execute procedure sync_user_email();
+    """)
+
+
 def downgrade() -> None:
+    op.execute("drop trigger if exists on_auth_email_change on auth.users;")
+    op.execute("drop function if exists sync_user_email();")
+
     op.drop_constraint('subscriptions_org_id_fkey', 'subscriptions', type_='foreignkey')
     op.create_foreign_key(
         'subscriptions_org_id_fkey', 'subscriptions',

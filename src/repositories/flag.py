@@ -4,12 +4,11 @@
 
 # Standard Library
 import uuid
-from typing import Optional
 
-# Third Party
+# Third-Party Library
 from sqlalchemy import select
 
-# Internal
+# Private Library
 from src.models.flag import FeatureFlag
 from src.repositories.base import BaseRepository
 
@@ -41,7 +40,7 @@ class FlagRepository(BaseRepository[FeatureFlag]):
 
     async def get_by_org_and_key(
         self, org_id: uuid.UUID, key: str
-    ) -> Optional[FeatureFlag]:
+    ) -> FeatureFlag | None:
         """Return a single flag by org and key.
 
         Args:

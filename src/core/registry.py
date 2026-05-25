@@ -6,7 +6,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Dict, Generic, TypeVar
 
-# Internal
+# Private Library
 from src.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -55,7 +55,9 @@ class Registry(Generic[T]):
             name = getattr(item, "name")
 
         if not name:
-            raise ValueError(f"Item {item.__class__.__name__} must have a non-empty name.")
+            raise ValueError(
+                f"Item {item.__class__.__name__} must have a non-empty name."
+            )
 
         if name in self._items:
             log.warning("registry.overwrite", registry=self.name, key=name)
@@ -88,9 +90,7 @@ class Registry(Generic[T]):
         """
         if name not in self._items:
             available = list(self._items.keys())
-            raise KeyError(
-                f"[{self.name}] '{name}' not found. Available: {available}"
-            )
+            raise KeyError(f"[{self.name}] '{name}' not found. Available: {available}")
         return self._items[name]
 
     def has(self, name: str) -> bool:

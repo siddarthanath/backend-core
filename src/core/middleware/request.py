@@ -6,13 +6,13 @@
 import time
 import uuid
 
-# Third Party
+# Third-Party Library
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 from structlog.contextvars import bind_contextvars, clear_contextvars
 
-# Internal
+# Private Library
 from src.core.context import set_request_id
 from src.utils.logging import get_logger
 
@@ -39,7 +39,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         start = time.perf_counter()
         try:
             response = await call_next(request)
-        except Exception:
+        except Exception:  # Catch-log-reraise: we want the request_id in the exception log before it propagates
             duration_ms = round(
                 (time.perf_counter() - start) * 1000,
                 1,

@@ -5,10 +5,10 @@
 # Standard Library
 import uuid
 
-# Third Party
+# Third-Party Library
 from fastapi import APIRouter, Request
 
-# Internal
+# Private Library
 from src.core.dependencies import ApiKeySvc, AuditSvc, CurrentUserID
 from src.core.middleware.rate_limit import limiter
 from src.schemas.api_key.requests import CreateApiKeyRequest
@@ -43,7 +43,9 @@ async def create_api_key(
     audit: AuditSvc,
 ) -> ApiKeyCreatedResponse:
     """Create a new API key. The raw key is returned once — store it securely. Requires admin role."""
-    result = await service.create(org_id, user_id, name=body.name, expires_at=body.expires_at)
+    result = await service.create(
+        org_id, user_id, name=body.name, expires_at=body.expires_at
+    )
     await audit.log_event(
         org_id=org_id,
         action="api_key.created",

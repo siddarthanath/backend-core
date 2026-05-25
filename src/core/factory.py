@@ -6,10 +6,10 @@
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
 
-# Third Party
+# Third-Party Library
 from fastapi import FastAPI
 
-# Internal
+# Private Library
 from src.api.router import router
 from src.configs.settings import app_settings
 from src.core.exceptions import add_exception_handlers
@@ -28,7 +28,9 @@ async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     db_session = DatabaseSession()
     db_session.initialise()
     db_registry.register(db_session, name="default")
-    log.info("app.started", name=app_settings.APP_NAME, version=app_settings.APP_VERSION)
+    log.info(
+        "app.started", name=app_settings.APP_NAME, version=app_settings.APP_VERSION
+    )
 
     yield
 

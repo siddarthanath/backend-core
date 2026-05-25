@@ -2,10 +2,10 @@
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
-# Third Party
+# Third-Party Library
 from fastapi import APIRouter
 
-# Internal
+# Private Library
 from src.api.v1 import api_keys, audit, billing, flags, health, org, user
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #

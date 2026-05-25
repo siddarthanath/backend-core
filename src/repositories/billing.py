@@ -5,11 +5,11 @@
 # Standard Library
 import uuid
 
-# Third Party
+# Third-Party Library
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 
-# Internal
+# Private Library
 from src.constants import Plan, SubscriptionStatus
 from src.models.billing import Subscription
 from src.repositories.base import BaseRepository
@@ -85,7 +85,9 @@ class SubscriptionRepository(BaseRepository[Subscription]):
             # leaving the outer transaction alive for the fallback get_by_org.
             async with self.session.begin_nested():
                 return await self.create(
-                    Subscription(org_id=org_id, plan=Plan.FREE, status=SubscriptionStatus.ACTIVE)
+                    Subscription(
+                        org_id=org_id, plan=Plan.FREE, status=SubscriptionStatus.ACTIVE
+                    )
                 )
         except IntegrityError:
             return await self.get_by_org(org_id)  # type: ignore[return-value]

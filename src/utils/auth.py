@@ -5,10 +5,10 @@
 # Standard Library
 from functools import lru_cache
 
-# Third Party
+# Third-Party Library
 from supabase import Client, create_client
 
-# Internal
+# Private Library
 from src.configs.settings import auth_settings
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #

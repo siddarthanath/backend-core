@@ -6,14 +6,14 @@
 import uuid
 from collections.abc import AsyncGenerator
 
-# Third Party
+# Third-Party Library
 import pytest
 import pytest_asyncio
 from asgi_lifespan import LifespanManager
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Internal
+# Private Library
 from src.core.dependencies.auth import get_current_user
 from src.main import app
 from src.schemas.auth import UserClaims
@@ -33,7 +33,9 @@ async def client() -> AsyncGenerator[AsyncClient, None]:
 
     """
     async with LifespanManager(app) as manager:
-        async with AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as c:
             yield c
 
 

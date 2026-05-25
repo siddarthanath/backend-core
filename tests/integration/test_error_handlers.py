@@ -5,7 +5,7 @@
 # Standard Library
 import uuid
 
-# Third Party
+# Third-Party Library
 import pytest
 from httpx import AsyncClient
 

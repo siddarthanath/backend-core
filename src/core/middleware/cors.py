@@ -2,11 +2,11 @@
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
-# Third Party
+# Third-Party Library
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Internal
+# Private Library
 from src.configs.settings import app_settings
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
