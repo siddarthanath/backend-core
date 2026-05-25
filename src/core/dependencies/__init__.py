@@ -13,7 +13,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Private Library
 from src.core.dependencies.auth import get_current_user
 from src.core.dependencies.database import get_db
-from src.repositories.billing import SubscriptionRepository
+from src.repositories.billing import (
+    StripeWebhookEventRepository,
+    SubscriptionRepository,
+)
 from src.repositories.org import MembershipRepository, OrgRepository
 from src.repositories.user import UserRepository
 from src.schemas.auth import UserClaims
@@ -104,11 +107,15 @@ def get_billing_service(session: DBSession) -> BillingOrchestrator:
         BillingOrchestrator: Ready-to-use orchestrator instance.
 
     """
+    # If deps here grow beyond 6, extract permission checking into a shared helper
+    # rather than adding more repos. Never inject AuditRepository or FlagRepository
+    # into billing — that's cross-domain leakage.
     return BillingOrchestrator(
         subscription_repo=SubscriptionRepository(session),
         org_repo=OrgRepository(session),
         membership_repo=MembershipRepository(session),
         billing_svc=StripeBillingService(),
+        webhook_event_repo=StripeWebhookEventRepository(session),
     )
 
 

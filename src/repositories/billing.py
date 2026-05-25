@@ -1,9 +1,10 @@
-"""SubscriptionRepository — data access for org subscriptions."""
+"""SubscriptionRepository and StripeWebhookEventRepository — billing data access."""
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
 # Standard Library
 import uuid
+from datetime import datetime, timezone
 
 # Third-Party Library
 from sqlalchemy.exc import IntegrityError
@@ -11,7 +12,7 @@ from sqlmodel import select
 
 # Private Library
 from src.constants import Plan, SubscriptionStatus
-from src.models.billing import Subscription
+from src.models.billing import Subscription, StripeWebhookEvent
 from src.repositories.base import BaseRepository
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
@@ -91,3 +92,41 @@ class SubscriptionRepository(BaseRepository[Subscription]):
                 )
         except IntegrityError:
             return await self.get_by_org(org_id)  # type: ignore[return-value]
+
+
+class StripeWebhookEventRepository:
+    """Repository for StripeWebhookEvent — idempotency deduplication for Stripe webhooks."""
+
+    def __init__(self, session: object) -> None:
+        self.session = session  # type: ignore[assignment]
+
+    async def exists(self, event_id: str) -> bool:
+        """Return True if this Stripe event has already been processed.
+
+        Args:
+            event_id (str): Stripe event ID (e.g. evt_xxxxx).
+
+        Returns:
+            bool: Whether the event is already recorded.
+
+        """
+        stmt = select(StripeWebhookEvent).where(StripeWebhookEvent.event_id == event_id)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none() is not None
+
+    async def record(self, event_id: str, event_type: str) -> None:
+        """Insert a processed event record.
+
+        Args:
+            event_id (str): Stripe event ID.
+            event_type (str): Stripe event type (e.g. checkout.session.completed).
+
+        """
+        self.session.add(
+            StripeWebhookEvent(
+                event_id=event_id,
+                event_type=event_type,
+                processed_at=datetime.now(timezone.utc),
+            )
+        )
+        await self.session.flush()
