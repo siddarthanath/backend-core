@@ -64,7 +64,17 @@ class OrgService:
         existing = await self.org_repo.get_by_slug(slug)
         if existing:
             return existing
-        return await self.create_org(user_id, name=email, slug=slug, is_personal=True)
+        try:
+            return await self.create_org(
+                user_id, name=email, slug=slug, is_personal=True
+            )
+        except ConflictError:
+            # Two concurrent first-logins both passed the get_by_slug check. The other
+            # request won the race — re-fetch and return the row it created.
+            org = await self.org_repo.get_by_slug(slug)
+            if org:
+                return org
+            raise
 
     async def list_my_orgs(self, user_id: uuid.UUID) -> list[Organisation]:
         """Return all orgs the user is an active member of.
@@ -341,6 +351,9 @@ class OrgService:
                     org = await self.org_repo.get_by_id(membership.org_id)
                     if org:
                         await self.org_repo.hard_delete(org)
+        # Remove all remaining memberships (non-owner roles, invited status, etc.).
+        # Without this, hard-deleting the UserProfile FK would raise an IntegrityError.
+        await self.membership_repo.delete_all_for_user(user_id)
 
     async def remove_member(
         self,

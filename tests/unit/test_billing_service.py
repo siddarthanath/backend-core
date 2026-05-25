@@ -12,7 +12,12 @@ from pydantic import ValidationError
 
 # Private Library
 from src.constants import BillingPeriod, Plan, SubscriptionStatus
-from src.core.exceptions.types import ConflictError, ForbiddenError, NotFoundError
+from src.core.exceptions.types import (
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+    ValidationError as DomainValidationError,
+)
 from src.repositories.billing import SubscriptionRepository
 from src.repositories.org import MembershipRepository, OrgRepository
 from src.schemas.billing.requests import (
@@ -362,7 +367,7 @@ class TestHandleWebhook:
             "Invalid Stripe webhook signature"
         )
 
-        with pytest.raises(ValueError, match="Invalid Stripe webhook signature"):
+        with pytest.raises(DomainValidationError, match="Invalid webhook signature"):
             await orchestrator.handle_webhook(b"payload", "bad-sig")
 
     @pytest.mark.unit

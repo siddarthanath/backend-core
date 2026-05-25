@@ -13,7 +13,12 @@ import stripe
 # Private Library
 from src.configs.settings import external_settings
 from src.constants import BillingPeriod, Plan, Role, SubscriptionStatus
-from src.core.exceptions.types import ConflictError, ForbiddenError, NotFoundError
+from src.core.exceptions.types import (
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+    ValidationError,
+)
 from src.repositories.billing import SubscriptionRepository
 from src.repositories.org import MembershipRepository, OrgRepository
 from src.schemas.billing.responses import (
@@ -408,7 +413,13 @@ class BillingOrchestrator:
             ValueError: If the webhook signature is invalid.
 
         """
-        event = await self.billing_svc.parse_webhook(payload, sig_header)
+        try:
+            event = await self.billing_svc.parse_webhook(payload, sig_header)
+        except ValueError as exc:
+            # Invalid Stripe signature — return 422 so the handler doesn't hit the generic 500.
+            # Stripe retries on any non-200; a 422 tells it the request was malformed, not a
+            # server fault.
+            raise ValidationError("Invalid webhook signature", detail=str(exc)) from exc
         event_type: str = event.get("type", "")
         data = event.get("data", {}).get("object", {})
 
