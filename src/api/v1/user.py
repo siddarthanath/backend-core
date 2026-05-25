@@ -63,6 +63,7 @@ async def get_me(
         created_at=user.created_at,
         org_count=len(orgs),
         org_id=personal_org.id if personal_org else None,
+        org_name=personal_org.name if personal_org else None,
     )
 
 
@@ -92,6 +93,7 @@ async def update_profile(
         created_at=user.created_at,
         org_count=len(orgs),
         org_id=personal_org.id if personal_org else None,
+        org_name=personal_org.name if personal_org else None,
     )
 
 

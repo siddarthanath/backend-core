@@ -12,7 +12,6 @@ from fastapi import APIRouter, Header, Request
 from src.core.dependencies import BillingSvc, CurrentUserID
 from src.core.middleware.rate_limit import limiter
 from src.schemas.billing.requests import (
-    CancelSubscriptionRequest,
     CreateCheckoutRequest,
     CreatePortalRequest,
     UpgradeSubscriptionRequest,
@@ -96,20 +95,25 @@ async def upgrade_subscription(
     return MessageResponse(message="Subscription upgraded")
 
 
-@router.post(
-    "/orgs/{org_id}/billing/cancel", response_model=MessageResponse, status_code=200
-)
-@limiter.limit("10/minute")
-async def cancel_subscription(
-    request: Request,
-    org_id: uuid.UUID,
-    body: CancelSubscriptionRequest,
-    user_id: CurrentUserID,
-    service: BillingSvc,
-) -> MessageResponse:
-    """Cancel the subscription at the end of the current billing period."""
-    await service.cancel_subscription(org_id, user_id, reason=body.reason)
-    return MessageResponse(message="Subscription will cancel at period end")
+# POST /orgs/{org_id}/billing/cancel — disabled. Cancellation is handled via the Stripe
+# portal (POST /orgs/{org_id}/billing/portal). Re-enable if adding an in-app cancel flow
+# with a reason modal. The service method (BillingOrchestrator.cancel_subscription) is
+# fully implemented and ready to wire up.
+#
+# @router.post(
+#     "/orgs/{org_id}/billing/cancel", response_model=MessageResponse, status_code=200
+# )
+# @limiter.limit("10/minute")
+# async def cancel_subscription(
+#     request: Request,
+#     org_id: uuid.UUID,
+#     body: CancelSubscriptionRequest,
+#     user_id: CurrentUserID,
+#     service: BillingSvc,
+# ) -> MessageResponse:
+#     """Cancel the subscription at the end of the current billing period."""
+#     await service.cancel_subscription(org_id, user_id, reason=body.reason)
+#     return MessageResponse(message="Subscription will cancel at period end")
 
 
 @router.post("/billing/webhook", response_model=MessageResponse)

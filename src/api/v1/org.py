@@ -13,7 +13,6 @@ from src.core.dependencies import CurrentUserID, OrgSvc
 from src.core.middleware.rate_limit import limiter
 from src.schemas.common import MessageResponse
 from src.schemas.org.requests import (
-    CreateOrgRequest,
     InviteMemberRequest,
     UpdateMemberRoleRequest,
     UpdateOrgRequest,
@@ -25,17 +24,21 @@ from src.schemas.org.responses import MemberResponse, OrgResponse
 router = APIRouter(prefix="/orgs", tags=["Organisations"])
 
 
-@router.post("", response_model=OrgResponse, status_code=201)
-@limiter.limit("10/minute")
-async def create_org(
-    request: Request,
-    body: CreateOrgRequest,
-    user_id: CurrentUserID,
-    service: OrgSvc,
-) -> OrgResponse:
-    """Create a new organisation. The caller becomes the owner automatically."""
-    org = await service.create_org(user_id, name=body.name, slug=body.slug)
-    return OrgResponse.model_validate(org)
+# B2C: org creation is intentionally not exposed. Each user gets exactly one personal
+# org, auto-created on first login via get_or_create_personal_org. Re-enable this
+# endpoint when adding B2B workspace support (multiple orgs per user, team invites).
+#
+# @router.post("", response_model=OrgResponse, status_code=201)
+# @limiter.limit("10/minute")
+# async def create_org(
+#     request: Request,
+#     body: CreateOrgRequest,
+#     user_id: CurrentUserID,
+#     service: OrgSvc,
+# ) -> OrgResponse:
+#     """Create a new organisation. The caller becomes the owner automatically."""
+#     org = await service.create_org(user_id, name=body.name, slug=body.slug)
+#     return OrgResponse.model_validate(org)
 
 
 @router.get("", response_model=list[OrgResponse])

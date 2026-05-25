@@ -86,6 +86,9 @@ class StripeBillingService(BaseBillingService):
             "success_url": success_url,
             "cancel_url": cancel_url,
             "metadata": {"org_id": org_id},
+            # Propagate org_id to the Stripe subscription so customer.subscription.created
+            # can look up the org without a second API call.
+            "subscription_data": {"metadata": {"org_id": org_id}},
         }
         # ONE-TIME CREDIT TOP-UPS: if the product later supports purchasing usage credits
         # (e.g. extra AI quota), create a separate checkout handler using mode="payment"
@@ -117,7 +120,6 @@ class StripeBillingService(BaseBillingService):
             lambda: stripe.billing_portal.Session.create(
                 customer=customer_id,
                 return_url=return_url,
-                idempotency_key=f"portal:{customer_id}",
             )
         )
         return session.url  # type: ignore[return-value]
@@ -452,6 +454,8 @@ class BillingOrchestrator:
         try:
             if event_type == "checkout.session.completed":
                 await self._on_checkout_completed(data)
+            elif event_type == "customer.subscription.created":
+                await self._on_subscription_created(data)
             elif event_type == "customer.subscription.updated":
                 await self._on_subscription_updated(data)
             elif event_type == "customer.subscription.deleted":
@@ -470,10 +474,11 @@ class BillingOrchestrator:
         await self.webhook_event_repo.record(event_id, event_type)
 
     async def _on_checkout_completed(self, data: dict) -> None:
+        """Map stripe_customer_id to the org. Subscription activation is handled by
+        customer.subscription.created which fires with the full subscription object."""
         org_id_str: str = data.get("metadata", {}).get("org_id", "")
-        stripe_sub_id: str = data.get("subscription", "")
         stripe_customer_id: str = data.get("customer", "")
-        if not org_id_str or not stripe_sub_id:
+        if not org_id_str:
             return
 
         try:
@@ -490,19 +495,36 @@ class BillingOrchestrator:
         if not org.stripe_customer_id and stripe_customer_id:
             await self.org_repo.update(org, stripe_customer_id=stripe_customer_id)
 
+    async def _on_subscription_created(self, data: dict) -> None:
+        """Activate the subscription from the customer.subscription.created event.
+
+        Stripe sends the full subscription object here — no extra API call needed.
+        org_id is available because create_checkout_session passes subscription_data
+        with metadata so Stripe propagates it to the subscription object.
+        """
+        stripe_sub_id: str = data.get("id", "")
+        org_id_str: str = data.get("metadata", {}).get("org_id", "")
+        if not stripe_sub_id or not org_id_str:
+            return
+
+        try:
+            org_id = uuid.UUID(org_id_str)
+        except ValueError:
+            log.warning("billing.webhook_invalid_org_id", org_id=org_id_str)
+            return
+
         sub = await self.subscription_repo.get_by_org(org_id)
         if not sub:
             return
 
-        raw_sub = await anyio.to_thread.run_sync(
-            lambda: stripe.Subscription.retrieve(stripe_sub_id)
-        )
-        stripe_sub: dict = raw_sub.to_dict()
-        item = stripe_sub["items"]["data"][0]
+        item = data["items"]["data"][0]
         price_id: str = item["price"]["id"]
         plan = self._plan_from_price(price_id)
-        period_end = datetime.fromtimestamp(
-            stripe_sub["current_period_end"], tz=timezone.utc
+        period_end_ts = data.get("current_period_end")
+        period_end = (
+            datetime.fromtimestamp(period_end_ts, tz=timezone.utc)
+            if period_end_ts
+            else None
         )
 
         await self.subscription_repo.update(
@@ -530,19 +552,44 @@ class BillingOrchestrator:
             status = SubscriptionStatus(status_str)
         except ValueError:
             status = SubscriptionStatus.ACTIVE
-        period_end = datetime.fromtimestamp(data["current_period_end"], tz=timezone.utc)
+        period_end_ts = data.get("current_period_end")
+        period_end = (
+            datetime.fromtimestamp(period_end_ts, tz=timezone.utc)
+            if period_end_ts
+            else None
+        )
 
-        # cancellation_details.feedback is intentionally not read here — Stripe's built-in
-        # cancellation survey is disabled in favour of our own in-app modal, so this field
-        # will never be present. The reason is captured by POST /billing/cancel instead.
-        await self.subscription_repo.update(
-            sub,
+        # Stripe portal uses cancel_at (specific timestamp) rather than cancel_at_period_end
+        # when "cancel at end of billing period" is configured — treat either as a scheduled cancel.
+        cancel_at_period_end = bool(data.get("cancel_at_period_end", False)) or bool(data.get("cancel_at"))
+        cancellation_details = data.get("cancellation_details") or {}
+        cancellation_reason: str | None = None
+        if cancel_at_period_end:
+            cancellation_reason = (
+                cancellation_details.get("comment")
+                or cancellation_details.get("feedback")
+                or cancellation_details.get("reason")
+            ) or None
+
+        log.info(
+            "billing.subscription_updated",
+            stripe_sub_id=stripe_sub_id,
+            plan=plan.value,
+            status=status.value,
+            cancel_at_period_end=cancel_at_period_end,
+        )
+
+        update_fields: dict[str, object] = dict(
             plan=plan,
             status=status,
             stripe_price_id=price_id,
             current_period_end=period_end,
-            cancel_at_period_end=bool(data.get("cancel_at_period_end", False)),
+            cancel_at_period_end=cancel_at_period_end,
         )
+        if cancel_at_period_end and cancellation_reason:
+            update_fields["cancellation_reason"] = cancellation_reason
+
+        await self.subscription_repo.update(sub, **update_fields)
 
     async def _on_subscription_deleted(self, data: dict) -> None:
         stripe_sub_id: str = data.get("id", "")

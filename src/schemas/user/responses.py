@@ -32,7 +32,8 @@ class UserMeResponse(UserProfileResponse):
     org_count: int = 0
     # B2C: personal org is auto-created on first login and returned here so the
     # frontend can use it for checkout without a separate /orgs fetch.
-    # B2B: remove org_id and let clients call GET /orgs to discover team workspaces.
+    # B2B: remove org_id/org_name and let clients call GET /orgs to discover team workspaces.
     org_id: uuid.UUID | None = None
+    org_name: str | None = None
     # plan is intentionally absent — fetch it from GET /billing/{org_id}/subscription.
     # Putting plan here would require a billing lookup on every auth check.
