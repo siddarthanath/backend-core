@@ -170,3 +170,33 @@ class TestVerify:
 
         result = await svc.verify("sk_badkey")
         assert result is None
+
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_returns_none_for_expired_key(self) -> None:
+        svc, repo, _, _ = make_service()
+        expired_key = make_key(expires_at=datetime(2020, 1, 1, tzinfo=timezone.utc))
+        repo.get_by_hash.return_value = expired_key
+
+        result = await svc.verify("sk_expiredkey")
+        assert result is None
+
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_returns_key_with_future_expiry(self) -> None:
+        svc, repo, _, _ = make_service()
+        future_key = make_key(expires_at=datetime(2099, 1, 1, tzinfo=timezone.utc))
+        repo.get_by_hash.return_value = future_key
+
+        result = await svc.verify("sk_validkey")
+        assert result == future_key
+
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_returns_key_with_no_expiry(self) -> None:
+        svc, repo, _, _ = make_service()
+        no_expiry_key = make_key(expires_at=None)
+        repo.get_by_hash.return_value = no_expiry_key
+
+        result = await svc.verify("sk_noexpiry")
+        assert result == no_expiry_key

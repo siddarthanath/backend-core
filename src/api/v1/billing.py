@@ -113,6 +113,7 @@ async def cancel_subscription(
 
 
 @router.post("/billing/webhook", response_model=MessageResponse)
+@limiter.limit("300/minute")
 async def stripe_webhook(
     request: Request,
     service: BillingSvc,

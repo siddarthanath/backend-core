@@ -12,8 +12,16 @@ from pydantic import ValidationError
 
 # Private Library
 from src.constants import BillingPeriod, Plan, SubscriptionStatus
-from src.core.exceptions.types import ConflictError, ForbiddenError, NotFoundError
-from src.repositories.billing import SubscriptionRepository
+from src.core.exceptions.types import (
+    AppValidationError,
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+)
+from src.repositories.billing import (
+    StripeWebhookEventRepository,
+    SubscriptionRepository,
+)
 from src.repositories.org import MembershipRepository, OrgRepository
 from src.schemas.billing.requests import (
     CancelSubscriptionRequest,
@@ -32,19 +40,32 @@ def make_orchestrator(
     org_repo=None,
     membership_repo=None,
     billing_svc=None,
+    webhook_event_repo=None,
 ):
     """Return a BillingOrchestrator wired to mocked dependencies."""
     subscription_repo = subscription_repo or AsyncMock(spec=SubscriptionRepository)
     org_repo = org_repo or AsyncMock(spec=OrgRepository)
     membership_repo = membership_repo or AsyncMock(spec=MembershipRepository)
     billing_svc = billing_svc or AsyncMock(spec=BaseBillingService)
+    webhook_event_repo = webhook_event_repo or AsyncMock(
+        spec=StripeWebhookEventRepository
+    )
+    webhook_event_repo.exists.return_value = False  # default: new event
     orchestrator = BillingOrchestrator(
         subscription_repo=subscription_repo,
         org_repo=org_repo,
         membership_repo=membership_repo,
         billing_svc=billing_svc,
+        webhook_event_repo=webhook_event_repo,
     )
-    return orchestrator, subscription_repo, org_repo, membership_repo, billing_svc
+    return (
+        orchestrator,
+        subscription_repo,
+        org_repo,
+        membership_repo,
+        billing_svc,
+        webhook_event_repo,
+    )
 
 
 def make_org(**kwargs):
@@ -127,7 +148,7 @@ class TestGetSubscription:
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_raises_not_found_for_unknown_org(self) -> None:
-        orchestrator, _, org_repo, _, _ = make_orchestrator()
+        orchestrator, _, org_repo, _, _, _ = make_orchestrator()
         org_repo.get_by_id.return_value = None
 
         with pytest.raises(NotFoundError):
@@ -136,7 +157,7 @@ class TestGetSubscription:
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_raises_forbidden_for_non_member(self) -> None:
-        orchestrator, _, org_repo, membership_repo, _ = make_orchestrator()
+        orchestrator, _, org_repo, membership_repo, _, _ = make_orchestrator()
         org_repo.get_by_id.return_value = make_org()
         membership_repo.user_has_role.return_value = False
 
@@ -146,7 +167,7 @@ class TestGetSubscription:
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_returns_upserted_free_sub(self) -> None:
-        orchestrator, subscription_repo, org_repo, membership_repo, _ = (
+        orchestrator, subscription_repo, org_repo, membership_repo, _, _ = (
             make_orchestrator()
         )
         org = make_org()
@@ -165,7 +186,7 @@ class TestCreateCheckout:
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_raises_forbidden_for_non_admin(self) -> None:
-        orchestrator, _, org_repo, membership_repo, _ = make_orchestrator()
+        orchestrator, _, org_repo, membership_repo, _, _ = make_orchestrator()
         org_repo.get_by_id.return_value = make_org()
         membership_repo.user_has_role.return_value = False
 
@@ -183,7 +204,7 @@ class TestCreateCheckout:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("plan", [Plan.FREE, Plan.ENTERPRISE])
     async def test_raises_conflict_for_non_stripe_plan(self, plan: Plan) -> None:
-        orchestrator, _, org_repo, membership_repo, _ = make_orchestrator()
+        orchestrator, _, org_repo, membership_repo, _, _ = make_orchestrator()
         org_repo.get_by_id.return_value = make_org()
         membership_repo.user_has_role.return_value = True
 
@@ -200,7 +221,7 @@ class TestCreateCheckout:
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_raises_conflict_when_already_on_plan(self) -> None:
-        orchestrator, subscription_repo, org_repo, membership_repo, _ = (
+        orchestrator, subscription_repo, org_repo, membership_repo, _, _ = (
             make_orchestrator()
         )
         org_repo.get_by_id.return_value = make_org()
@@ -222,7 +243,7 @@ class TestCreateCheckout:
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_calls_billing_svc_and_returns_url(self) -> None:
-        orchestrator, subscription_repo, org_repo, membership_repo, billing_svc = (
+        orchestrator, subscription_repo, org_repo, membership_repo, billing_svc, _ = (
             make_orchestrator()
         )
         org = make_org()
@@ -253,7 +274,7 @@ class TestCreateCheckout:
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_raises_when_price_id_not_configured(self) -> None:
-        orchestrator, subscription_repo, org_repo, membership_repo, _ = (
+        orchestrator, subscription_repo, org_repo, membership_repo, _, _ = (
             make_orchestrator()
         )
         org_repo.get_by_id.return_value = make_org()
@@ -277,7 +298,7 @@ class TestCreateCheckout:
     async def test_routes_correct_price_id_per_period(
         self, period: BillingPeriod
     ) -> None:
-        orchestrator, subscription_repo, org_repo, membership_repo, billing_svc = (
+        orchestrator, subscription_repo, org_repo, membership_repo, billing_svc, _ = (
             make_orchestrator()
         )
         org = make_org()
@@ -312,12 +333,13 @@ class TestCreateCheckout:
 class TestPlanFromPrice:
     @pytest.mark.unit
     def test_raises_on_unknown_price_id(self) -> None:
-        _, _, _, _, billing_svc = make_orchestrator()
+        _, _, _, _, billing_svc, _ = make_orchestrator()
         orchestrator = BillingOrchestrator(
             subscription_repo=AsyncMock(),
             org_repo=AsyncMock(),
             membership_repo=AsyncMock(),
             billing_svc=billing_svc,
+            webhook_event_repo=AsyncMock(spec=StripeWebhookEventRepository),
         )
         with patch(
             "src.services.billing.service._build_price_map",
@@ -331,7 +353,7 @@ class TestCreatePortal:
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_raises_forbidden_for_non_admin(self) -> None:
-        orchestrator, _, org_repo, membership_repo, _ = make_orchestrator()
+        orchestrator, _, org_repo, membership_repo, _, _ = make_orchestrator()
         org_repo.get_by_id.return_value = make_org()
         membership_repo.user_has_role.return_value = False
 
@@ -343,7 +365,7 @@ class TestCreatePortal:
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_raises_forbidden_when_no_stripe_customer(self) -> None:
-        orchestrator, _, org_repo, membership_repo, _ = make_orchestrator()
+        orchestrator, _, org_repo, membership_repo, _, _ = make_orchestrator()
         org_repo.get_by_id.return_value = make_org(stripe_customer_id=None)
         membership_repo.user_has_role.return_value = True
 
@@ -357,19 +379,52 @@ class TestHandleWebhook:
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_raises_on_invalid_signature(self) -> None:
-        orchestrator, _, _, _, billing_svc = make_orchestrator()
+        orchestrator, _, _, _, billing_svc, _ = make_orchestrator()
         billing_svc.parse_webhook.side_effect = ValueError(
             "Invalid Stripe webhook signature"
         )
 
-        with pytest.raises(ValueError, match="Invalid Stripe webhook signature"):
+        with pytest.raises(AppValidationError, match="Invalid webhook signature"):
             await orchestrator.handle_webhook(b"payload", "bad-sig")
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_ignores_unknown_event_type(self) -> None:
-        orchestrator, subscription_repo, _, _, billing_svc = make_orchestrator()
+    async def test_skips_duplicate_event(self) -> None:
+        orchestrator, subscription_repo, _, _, billing_svc, webhook_event_repo = (
+            make_orchestrator()
+        )
+        webhook_event_repo.exists.return_value = True
         billing_svc.parse_webhook.return_value = {
+            "id": "evt_duplicate",
+            "type": "checkout.session.completed",
+            "data": {"object": {}},
+        }
+
+        await orchestrator.handle_webhook(b"payload", "sig")
+
+        subscription_repo.update.assert_not_awaited()
+        webhook_event_repo.record.assert_not_awaited()
+
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_records_event_after_processing(self) -> None:
+        orchestrator, _, _, _, billing_svc, webhook_event_repo = make_orchestrator()
+        billing_svc.parse_webhook.return_value = {
+            "id": "evt_new",
+            "type": "unknown.event",
+            "data": {"object": {}},
+        }
+
+        await orchestrator.handle_webhook(b"payload", "sig")
+
+        webhook_event_repo.record.assert_awaited_once_with("evt_new", "unknown.event")
+
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_ignores_unknown_event_type(self) -> None:
+        orchestrator, subscription_repo, _, _, billing_svc, _ = make_orchestrator()
+        billing_svc.parse_webhook.return_value = {
+            "id": "evt_unknown",
             "type": "unknown.event",
             "data": {"object": {}},
         }
@@ -381,7 +436,9 @@ class TestHandleWebhook:
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_checkout_completed_activates_subscription(self) -> None:
-        orchestrator, subscription_repo, org_repo, _, billing_svc = make_orchestrator()
+        orchestrator, subscription_repo, org_repo, _, billing_svc, _ = (
+            make_orchestrator()
+        )
         org_id = uuid.uuid4()
         org = make_org(id=org_id, stripe_customer_id=None)
         sub = make_subscription(org_id=org_id, plan=Plan.FREE)
@@ -420,7 +477,9 @@ class TestHandleWebhook:
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_checkout_completed_writes_stripe_customer_id_to_org(self) -> None:
-        orchestrator, subscription_repo, org_repo, _, billing_svc = make_orchestrator()
+        orchestrator, subscription_repo, org_repo, _, billing_svc, _ = (
+            make_orchestrator()
+        )
         org_id = uuid.uuid4()
         org = make_org(id=org_id, stripe_customer_id=None)
         sub = make_subscription(org_id=org_id)
@@ -457,7 +516,9 @@ class TestHandleWebhook:
     async def test_checkout_completed_skips_customer_update_if_already_set(
         self,
     ) -> None:
-        orchestrator, subscription_repo, org_repo, _, billing_svc = make_orchestrator()
+        orchestrator, subscription_repo, org_repo, _, billing_svc, _ = (
+            make_orchestrator()
+        )
         org_id = uuid.uuid4()
         org = make_org(id=org_id, stripe_customer_id="cus_existing")
         sub = make_subscription(org_id=org_id)
@@ -492,7 +553,9 @@ class TestHandleWebhook:
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_checkout_completed_does_nothing_if_org_missing(self) -> None:
-        orchestrator, subscription_repo, org_repo, _, billing_svc = make_orchestrator()
+        orchestrator, subscription_repo, org_repo, _, billing_svc, _ = (
+            make_orchestrator()
+        )
         billing_svc.parse_webhook.return_value = {
             "type": "checkout.session.completed",
             "data": {
@@ -512,7 +575,7 @@ class TestHandleWebhook:
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_subscription_updated_changes_plan_and_status(self) -> None:
-        orchestrator, subscription_repo, _, _, billing_svc = make_orchestrator()
+        orchestrator, subscription_repo, _, _, billing_svc, _ = make_orchestrator()
         sub = make_subscription(plan=Plan.FREE)
         subscription_repo.get_by_stripe_subscription_id.return_value = sub
 
@@ -542,7 +605,7 @@ class TestHandleWebhook:
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_subscription_deleted_resets_to_free(self) -> None:
-        orchestrator, subscription_repo, _, _, billing_svc = make_orchestrator()
+        orchestrator, subscription_repo, _, _, billing_svc, _ = make_orchestrator()
         sub = make_subscription(plan=Plan.PRO, stripe_subscription_id="sub_test123")
         subscription_repo.get_by_stripe_subscription_id.return_value = sub
 
@@ -561,7 +624,7 @@ class TestHandleWebhook:
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_payment_failed_sets_past_due(self) -> None:
-        orchestrator, subscription_repo, _, _, billing_svc = make_orchestrator()
+        orchestrator, subscription_repo, _, _, billing_svc, _ = make_orchestrator()
         sub = make_subscription(plan=Plan.PRO)
         subscription_repo.get_by_stripe_subscription_id.return_value = sub
 
@@ -578,7 +641,7 @@ class TestHandleWebhook:
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_payment_failed_does_nothing_if_subscription_not_found(self) -> None:
-        orchestrator, subscription_repo, _, _, billing_svc = make_orchestrator()
+        orchestrator, subscription_repo, _, _, billing_svc, _ = make_orchestrator()
         subscription_repo.get_by_stripe_subscription_id.return_value = None
 
         billing_svc.parse_webhook.return_value = {
@@ -595,7 +658,9 @@ class TestHandleWebhook:
     async def test_unknown_price_id_does_not_raise_or_retry(self) -> None:
         # If _plan_from_price raises ValueError (misconfigured price ID), the webhook
         # must return cleanly — not propagate the error and trigger infinite Stripe retries.
-        orchestrator, subscription_repo, org_repo, _, billing_svc = make_orchestrator()
+        orchestrator, subscription_repo, org_repo, _, billing_svc, _ = (
+            make_orchestrator()
+        )
         org_id = uuid.uuid4()
         org = make_org(id=org_id)
         sub = make_subscription(org_id=org_id)

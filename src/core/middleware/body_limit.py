@@ -27,6 +27,10 @@ class BodySizeLimitMiddleware(BaseHTTPMiddleware):
     server memory before FastAPI begins parsing). Does not buffer the body.
     Chunked encoding is rejected outright — it carries no Content-Length header
     and would otherwise bypass the size check entirely.
+
+    Deployment note: clients that omit Content-Length entirely bypass this check.
+    Set an independent body size limit on your reverse proxy as a first line of
+    defence (nginx: `client_max_body_size 1m;`, Railway/Render: platform setting).
     """
 
     def __init__(self, app: object, max_bytes: int = _DEFAULT_MAX_BYTES) -> None:

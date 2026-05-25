@@ -92,6 +92,52 @@ class TestCreateOrg:
         assert created.status == MembershipStatus.ACTIVE
 
 
+class TestGetOrCreatePersonal:
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_returns_existing_org(self) -> None:
+        service, org_repo, _, _ = make_service()
+        user_id = uuid.uuid4()
+        existing = make_org(slug=str(user_id))
+        org_repo.get_by_slug.return_value = existing
+
+        result = await service.get_or_create_personal(user_id, email="u@example.com")
+
+        assert result is existing
+        org_repo.create.assert_not_awaited()
+
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_creates_personal_org_on_first_call(self) -> None:
+        service, org_repo, membership_repo, _ = make_service()
+        user_id = uuid.uuid4()
+        org_repo.get_by_slug.return_value = None
+        new_org = make_org(slug=str(user_id))
+        org_repo.create.return_value = new_org
+        membership_repo.create.return_value = make_membership()
+
+        result = await service.get_or_create_personal(user_id, email="u@example.com")
+
+        assert result is new_org
+
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_handles_race_condition_on_concurrent_first_login(self) -> None:
+        # Simulates two concurrent first-logins: both pass the initial get_by_slug check.
+        # The race winner commits before the loser's create_org slug check runs, so
+        # create_org raises ConflictError. get_or_create_personal catches it and re-fetches.
+        # get_by_slug call sequence: None (initial) → org (inside create_org) → org (re-fetch).
+        service, org_repo, _, _ = make_service()
+        user_id = uuid.uuid4()
+        org = make_org(slug=str(user_id))
+
+        org_repo.get_by_slug.side_effect = [None, org, org]
+
+        result = await service.get_or_create_personal(user_id, email="u@example.com")
+
+        assert result is org
+
+
 class TestGetOrg:
     @pytest.mark.unit
     @pytest.mark.asyncio
@@ -326,3 +372,37 @@ class TestCleanupForDeletedUser:
         await service.cleanup_for_deleted_user(uuid.uuid4())
 
         org_repo.hard_delete.assert_not_awaited()
+
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_deletes_non_owner_memberships(self) -> None:
+        service, org_repo, membership_repo, _ = make_service()
+        user_id = uuid.uuid4()
+        membership = make_membership(user_id=user_id, role=Role.MEMBER)
+
+        membership_repo.get_user_memberships.return_value = [membership]
+
+        await service.cleanup_for_deleted_user(user_id)
+
+        org_repo.hard_delete.assert_not_awaited()
+        membership_repo.delete_all_for_user.assert_awaited_once_with(user_id)
+
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_deletes_all_memberships_after_org_cleanup(self) -> None:
+        service, org_repo, membership_repo, _ = make_service()
+        user_id = uuid.uuid4()
+        org_id = uuid.uuid4()
+        org = make_org(id=org_id)
+        owner_membership = make_membership(
+            user_id=user_id, org_id=org_id, role=Role.OWNER
+        )
+
+        membership_repo.get_user_memberships.return_value = [owner_membership]
+        membership_repo.count_owners.return_value = 1
+        org_repo.get_by_id.return_value = org
+
+        await service.cleanup_for_deleted_user(user_id)
+
+        org_repo.hard_delete.assert_awaited_once_with(org)
+        membership_repo.delete_all_for_user.assert_awaited_once_with(user_id)

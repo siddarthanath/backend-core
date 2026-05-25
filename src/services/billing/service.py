@@ -13,8 +13,16 @@ import stripe
 # Private Library
 from src.configs.settings import external_settings
 from src.constants import BillingPeriod, Plan, Role, SubscriptionStatus
-from src.core.exceptions.types import ConflictError, ForbiddenError, NotFoundError
-from src.repositories.billing import SubscriptionRepository
+from src.core.exceptions.types import (
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+    AppValidationError,
+)
+from src.repositories.billing import (
+    StripeWebhookEventRepository,
+    SubscriptionRepository,
+)
 from src.repositories.org import MembershipRepository, OrgRepository
 from src.schemas.billing.responses import (
     CheckoutResponse,
@@ -87,7 +95,10 @@ class StripeBillingService(BaseBillingService):
             params["customer"] = customer_id
 
         session = await anyio.to_thread.run_sync(
-            lambda: stripe.checkout.Session.create(**params)
+            lambda: stripe.checkout.Session.create(
+                **params,
+                idempotency_key=f"checkout:{org_id}:{price_id}",
+            )
         )
         return session.url, session.customer  # type: ignore[return-value]
 
@@ -106,6 +117,7 @@ class StripeBillingService(BaseBillingService):
             lambda: stripe.billing_portal.Session.create(
                 customer=customer_id,
                 return_url=return_url,
+                idempotency_key=f"portal:{customer_id}",
             )
         )
         return session.url  # type: ignore[return-value]
@@ -128,6 +140,7 @@ class StripeBillingService(BaseBillingService):
                 items=[{"id": item_id, "price": price_id}],
                 # Charge the prorated difference immediately rather than crediting the next invoice
                 proration_behavior="always_invoice",
+                idempotency_key=f"upgrade:{stripe_sub_id}:{price_id}",
             )
         )
 
@@ -139,7 +152,11 @@ class StripeBillingService(BaseBillingService):
 
         """
         await anyio.to_thread.run_sync(
-            lambda: stripe.Subscription.modify(stripe_sub_id, cancel_at_period_end=True)
+            lambda: stripe.Subscription.modify(
+                stripe_sub_id,
+                cancel_at_period_end=True,
+                idempotency_key=f"cancel:{stripe_sub_id}",
+            )
         )
 
     async def parse_webhook(self, payload: bytes, sig_header: str) -> dict:
@@ -174,11 +191,13 @@ class BillingOrchestrator:
         org_repo: OrgRepository,
         membership_repo: MembershipRepository,
         billing_svc: BaseBillingService,
+        webhook_event_repo: StripeWebhookEventRepository,
     ) -> None:
         self.subscription_repo = subscription_repo
         self.org_repo = org_repo
         self.membership_repo = membership_repo
         self.billing_svc = billing_svc
+        self.webhook_event_repo = webhook_event_repo
 
     async def get_subscription(
         self, org_id: uuid.UUID, user_id: uuid.UUID
@@ -408,9 +427,25 @@ class BillingOrchestrator:
             ValueError: If the webhook signature is invalid.
 
         """
-        event = await self.billing_svc.parse_webhook(payload, sig_header)
+        try:
+            event = await self.billing_svc.parse_webhook(payload, sig_header)
+        except ValueError as exc:
+            # Invalid Stripe signature — return 422 so the handler doesn't hit the generic 500.
+            # Stripe retries on any non-200; a 422 tells it the request was malformed, not a
+            # server fault.
+            raise AppValidationError(
+                "Invalid webhook signature", detail=str(exc)
+            ) from exc
+
+        event_id: str = event.get("id", "")
         event_type: str = event.get("type", "")
         data = event.get("data", {}).get("object", {})
+
+        if await self.webhook_event_repo.exists(event_id):
+            log.info(
+                "billing.webhook_duplicate", event_id=event_id, event_type=event_type
+            )
+            return
 
         log.info("billing.webhook_received", event_type=event_type)
 
@@ -431,6 +466,8 @@ class BillingOrchestrator:
                 event_type=event_type,
                 error=str(exc),
             )
+
+        await self.webhook_event_repo.record(event_id, event_type)
 
     async def _on_checkout_completed(self, data: dict) -> None:
         org_id_str: str = data.get("metadata", {}).get("org_id", "")

@@ -1,4 +1,4 @@
-"""Subscription model — one row per org, tracks billing plan and Stripe state."""
+"""Billing models — Subscription and StripeWebhookEvent."""
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
@@ -68,4 +68,28 @@ class Subscription(UUIDMixin, TimestampMixin, SQLModel, table=True):
     cancellation_reason: Optional[str] = Field(
         default=None,
         description="Reason captured from the in-app cancellation modal; NULL for portal cancellations",
+    )
+
+
+class StripeWebhookEvent(SQLModel, table=True):
+    """Processed Stripe webhook events — used to deduplicate retries.
+
+    Stripe retries webhooks for 72 hours on any non-200 response. Before processing
+    any event, check if event_id already exists here. If yes, return 200 immediately.
+    If no, process and insert in the same transaction.
+
+    Add new event handlers here — never use a column on `subscriptions` for this;
+    a column only remembers the last event ID so delayed retries of older events
+    would be reprocessed.
+
+    """
+
+    __tablename__ = "stripe_webhook_events"
+
+    # Stripe event IDs are globally unique strings (evt_xxxxx) — use as PK directly.
+    event_id: str = Field(primary_key=True)
+    event_type: str = Field(nullable=False)
+    processed_at: datetime = Field(
+        nullable=False,
+        sa_type=sa.DateTime(timezone=True),
     )

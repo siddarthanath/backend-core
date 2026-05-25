@@ -1,4 +1,4 @@
-"""Unit tests for UserService — no database, all repositories mocked."""
+"""Unit tests for UserService and user request schemas — no database, all repositories mocked."""
 
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
@@ -9,10 +9,12 @@ from unittest.mock import AsyncMock, MagicMock
 
 # Third-Party Library
 import pytest
+from pydantic import ValidationError
 
 # Private Library
 from src.core.exceptions.types import NotFoundError
 from src.repositories.user import UserRepository
+from src.schemas.user.requests import UpdatePasswordRequest
 from src.services.user.service import UserService
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
@@ -39,6 +41,33 @@ def make_profile(**kwargs: object) -> MagicMock:
     profile.first_name = kwargs.get("first_name", None)
     profile.last_name = kwargs.get("last_name", None)
     return profile
+
+
+class TestUpdatePasswordRequest:
+    @pytest.mark.unit
+    def test_accepts_strong_password(self) -> None:
+        req = UpdatePasswordRequest(new_password="Secure1!")
+        assert req.new_password == "Secure1!"
+
+    @pytest.mark.unit
+    def test_rejects_too_short(self) -> None:
+        with pytest.raises(ValidationError, match="8 characters"):
+            UpdatePasswordRequest(new_password="Sh0rt!")
+
+    @pytest.mark.unit
+    def test_rejects_no_uppercase(self) -> None:
+        with pytest.raises(ValidationError, match="uppercase"):
+            UpdatePasswordRequest(new_password="nouppercase1!")
+
+    @pytest.mark.unit
+    def test_rejects_no_digit(self) -> None:
+        with pytest.raises(ValidationError, match="number"):
+            UpdatePasswordRequest(new_password="NoDigits!")
+
+    @pytest.mark.unit
+    def test_rejects_no_special_char(self) -> None:
+        with pytest.raises(ValidationError, match="special"):
+            UpdatePasswordRequest(new_password="NoSpecial1")
 
 
 class TestGetMe:

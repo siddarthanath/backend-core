@@ -31,9 +31,17 @@ class UpdatePasswordRequest(BaseModel):
     @field_validator("new_password")
     @classmethod
     def password_strength(cls, v: str) -> str:
-        """Enforce minimum password length."""
+        """Mirror the frontend PASSWORD_RULES from src/lib/auth/password.ts."""
         if len(v) < 8:
             raise ValueError("Password must be at least 8 characters")
+        if not any(c.isupper() for c in v):
+            raise ValueError(
+                "Password must contain at least one uppercase letter (A–Z)"
+            )
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one number (0–9)")
+        if not any(not c.isalnum() for c in v):
+            raise ValueError("Password must contain at least one special character")
         return v
 
 

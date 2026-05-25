@@ -6,7 +6,7 @@
 import hashlib
 import secrets
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Private Library
 from src.constants import Role
@@ -142,11 +142,14 @@ class ApiKeyService:
             raw_key (str): The raw API key from the Authorization header.
 
         Returns:
-            ApiKey | None: The matching active key, or None if not found/revoked.
+            ApiKey | None: The matching active non-expired key, or None.
 
         """
         key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
-        return await self.repo.get_by_hash(key_hash)
+        key = await self.repo.get_by_hash(key_hash)
+        if key and key.expires_at and key.expires_at < datetime.now(timezone.utc):
+            return None
+        return key
 
     async def _assert_admin(self, org_id: uuid.UUID, user_id: uuid.UUID) -> None:
         org = await self.org_repo.get_by_id(org_id)

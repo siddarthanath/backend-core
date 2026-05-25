@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 # Private Library
+from src.core.exceptions.types import AccountDeletedError
 from src.models.user import UserProfile
 from src.repositories.base import BaseRepository
 
@@ -68,5 +69,8 @@ class UserRepository(BaseRepository[UserProfile]):
         )
         await self.session.execute(stmt)
         result = await self.get_by_id(user_id)
-        assert result is not None
+        # ON CONFLICT DO NOTHING fires when a soft-deleted user re-logs in —
+        # the insert is skipped but get_by_id returns None because _not_deleted() filters it.
+        if result is None:
+            raise AccountDeletedError()
         return result

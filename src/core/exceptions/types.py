@@ -51,6 +51,23 @@ class ConflictError(CoreException):
         )
 
 
+class AccountDeletedError(CoreException):
+    """Raised when a soft-deleted user attempts to authenticate (409).
+
+    Distinct code lets the frontend show a targeted "contact support" message
+    rather than a generic conflict error.
+
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            code="ACCOUNT_DELETED",
+            message="This account has been deleted",
+            detail="Contact support to reinstate your account",
+            status_code=409,
+        )
+
+
 class ForbiddenError(CoreException):
     """Raised when the caller lacks permission to perform an action (403)."""
 
@@ -60,7 +77,7 @@ class ForbiddenError(CoreException):
         )
 
 
-class ValidationError(CoreException):
+class AppValidationError(CoreException):
     """Raised when business-level validation fails (422)."""
 
     def __init__(
