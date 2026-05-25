@@ -152,26 +152,28 @@ async def delete_account(
 ) -> MessageResponse:
     """Soft-delete the user's profile and revoke their Supabase auth record.
 
-    Order: delete Supabase auth (AuthService) → clean up sole-owned orgs (OrgService)
-    → soft-delete profile (UserService).
+    Order: clean up sole-owned orgs (OrgService) → soft-delete profile (UserService)
+    → delete Supabase auth (AuthService).
 
-    Auth is deleted first so that failure at any later step leaves no broken state:
-    - If auth delete fails: nothing changed, user still has full access.
-    - If org cleanup or profile soft-delete fails after auth delete: user cannot log in
-      (auth record is gone), and the orphaned profile row is cleaned up by a periodic
-      maintenance job (find profiles where deleted_at IS NULL but no Supabase auth user
-      exists and soft-delete them). No manual intervention needed.
+    Failure modes:
+    - If org cleanup fails: nothing changed, user still has full access.
+    - If profile soft-delete fails after org cleanup: orphaned org rows remain but
+      user can still log in and contact support. No Stripe subscriptions are orphaned
+      because org deletion cascades subscription rows at the DB level.
+    - If Supabase auth delete fails after DB is cleared: user has no profile or
+      memberships so they cannot access any data. The orphaned auth record is benign —
+      their next login attempt creates a fresh profile via upsert_from_supabase.
 
     body.confirmation must equal "DELETE MY ACCOUNT".
 
-    Production pattern: replace this with status=pending_deletion and enqueue a
-    background job to hard-delete the row, cancel Stripe, purge storage, and remove
-    from email lists asynchronously with retries after a grace period.
+    Production pattern: replace with status=pending_deletion and enqueue a background
+    job to hard-delete, cancel Stripe, purge storage, and remove from email lists
+    asynchronously with retries after a grace period.
 
     """
-    await auth_service.delete_user(user_id)
     await org_service.cleanup_for_deleted_user(user_id)
     await service.delete(user_id)
+    await auth_service.delete_user(user_id)
     return MessageResponse(
         message="Account deleted.",
         detail="All your data has been permanently removed.",
