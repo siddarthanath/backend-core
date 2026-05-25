@@ -60,7 +60,7 @@ class ForbiddenError(CoreException):
         )
 
 
-class ValidationError(CoreException):
+class AppValidationError(CoreException):
     """Raised when business-level validation fails (422)."""
 
     def __init__(

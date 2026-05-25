@@ -13,7 +13,7 @@ from src.core.exceptions.types import (
     ForbiddenError,
     NotFoundError,
     RateLimitError,
-    ValidationError,
+    AppValidationError,
 )
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
@@ -28,5 +28,5 @@ __all__ = [
     "ForbiddenError",
     "NotFoundError",
     "RateLimitError",
-    "ValidationError",
+    "AppValidationError",
 ]

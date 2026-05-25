@@ -17,7 +17,7 @@ from src.core.exceptions.types import (
     ConflictError,
     ForbiddenError,
     NotFoundError,
-    ValidationError,
+    AppValidationError,
 )
 from src.repositories.billing import SubscriptionRepository
 from src.repositories.org import MembershipRepository, OrgRepository
@@ -419,7 +419,7 @@ class BillingOrchestrator:
             # Invalid Stripe signature — return 422 so the handler doesn't hit the generic 500.
             # Stripe retries on any non-200; a 422 tells it the request was malformed, not a
             # server fault.
-            raise ValidationError("Invalid webhook signature", detail=str(exc)) from exc
+            raise AppValidationError("Invalid webhook signature", detail=str(exc)) from exc
         event_type: str = event.get("type", "")
         data = event.get("data", {}).get("object", {})
 
