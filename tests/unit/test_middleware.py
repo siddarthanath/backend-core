@@ -79,3 +79,15 @@ class TestBodySizeLimitMiddleware:
         assert response.status_code == 400
         data = response.json()
         assert data["error"]["code"] == "BAD_REQUEST"
+
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_returns_411_for_chunked_encoding(
+        self, body_limit_client: AsyncClient
+    ) -> None:
+        response = await body_limit_client.post(
+            "/echo", headers={"transfer-encoding": "chunked"}
+        )
+        assert response.status_code == 411
+        data = response.json()
+        assert data["error"]["code"] == "LENGTH_REQUIRED"

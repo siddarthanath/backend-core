@@ -35,7 +35,6 @@ class SubscriptionRepository(BaseRepository[Subscription]):
         stmt = (
             select(Subscription)
             .where(Subscription.org_id == org_id)
-            .where(self._not_deleted())
         )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
@@ -55,7 +54,6 @@ class SubscriptionRepository(BaseRepository[Subscription]):
         stmt = (
             select(Subscription)
             .where(Subscription.stripe_subscription_id == stripe_subscription_id)
-            .where(self._not_deleted())
         )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()

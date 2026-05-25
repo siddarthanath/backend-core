@@ -1,6 +1,7 @@
 """BodySizeLimitMiddleware — reject oversized request bodies before they reach handlers."""
 
-# ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
+# Standard Library
+# (none)
 
 # Third-Party Library
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -8,17 +9,14 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 # Private Library
+from src.core.exceptions.envelope import ErrorEnvelope
 from src.utils.logging import get_logger
-
-# ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
 log = get_logger(__name__)
 
-# Checked against Content-Length header only. Chunked transfers without Content-Length are not
-# capped here — acceptable for a JSON API where chunked uploads are not expected.
 # File uploads bypass this entirely: the frontend requests a pre-signed URL from the backend,
-# then uploads directly to Supabase Storage (storage.supabase.co) — file bytes never reach
-# FastAPI, so this limit only ever applies to JSON request bodies.
+# then uploads directly to Supabase Storage — file bytes never reach FastAPI.
+# This limit applies to JSON request bodies only.
 _DEFAULT_MAX_BYTES = 1 * 1024 * 1024  # 1 MB
 
 
@@ -27,6 +25,8 @@ class BodySizeLimitMiddleware(BaseHTTPMiddleware):
 
     Defends against trivial payload DoS attacks (large JSON bodies consuming
     server memory before FastAPI begins parsing). Does not buffer the body.
+    Chunked encoding is rejected outright — it carries no Content-Length header
+    and would otherwise bypass the size check entirely.
     """
 
     def __init__(self, app: object, max_bytes: int = _DEFAULT_MAX_BYTES) -> None:
@@ -34,6 +34,15 @@ class BodySizeLimitMiddleware(BaseHTTPMiddleware):
         self.max_bytes = max_bytes
 
     async def dispatch(self, request: Request, call_next: object) -> Response:
+        if request.headers.get("transfer-encoding", "").lower() == "chunked":
+            return JSONResponse(
+                status_code=411,
+                content=ErrorEnvelope.from_exception(
+                    code="LENGTH_REQUIRED",
+                    message="Chunked transfer encoding is not supported",
+                ).model_dump(),
+            )
+
         content_length = request.headers.get("content-length")
         if content_length is not None:
             try:
@@ -41,12 +50,10 @@ class BodySizeLimitMiddleware(BaseHTTPMiddleware):
             except ValueError:
                 return JSONResponse(
                     status_code=400,
-                    content={
-                        "error": {
-                            "code": "BAD_REQUEST",
-                            "message": "Invalid Content-Length header",
-                        }
-                    },
+                    content=ErrorEnvelope.from_exception(
+                        code="BAD_REQUEST",
+                        message="Invalid Content-Length header",
+                    ).model_dump(),
                 )
             if length > self.max_bytes:
                 log.warning(
@@ -57,11 +64,10 @@ class BodySizeLimitMiddleware(BaseHTTPMiddleware):
                 )
                 return JSONResponse(
                     status_code=413,
-                    content={
-                        "error": {
-                            "code": "PAYLOAD_TOO_LARGE",
-                            "message": f"Request body must not exceed {self.max_bytes // (1024 * 1024)} MB",
-                        }
-                    },
+                    content=ErrorEnvelope.from_exception(
+                        code="PAYLOAD_TOO_LARGE",
+                        message=f"Request body must not exceed {self.max_bytes // (1024 * 1024)} MB",
+                    ).model_dump(),
                 )
+
         return await call_next(request)  # type: ignore[misc]

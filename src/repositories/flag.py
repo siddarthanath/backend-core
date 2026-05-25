@@ -33,7 +33,6 @@ class FlagRepository(BaseRepository[FeatureFlag]):
         stmt = (
             select(FeatureFlag)
             .where(FeatureFlag.org_id == org_id)
-            .where(self._not_deleted())
             .order_by(FeatureFlag.key)
         )
         result = await self.session.execute(stmt)
@@ -56,7 +55,6 @@ class FlagRepository(BaseRepository[FeatureFlag]):
             select(FeatureFlag)
             .where(FeatureFlag.org_id == org_id)
             .where(FeatureFlag.key == key)
-            .where(self._not_deleted())
         )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()

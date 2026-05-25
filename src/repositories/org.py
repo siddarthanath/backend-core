@@ -87,7 +87,6 @@ class MembershipRepository(BaseRepository[Membership]):
         stmt = (
             select(Membership)
             .where(and_(Membership.user_id == user_id, Membership.org_id == org_id))
-            .where(self._not_deleted())
         )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
@@ -107,7 +106,6 @@ class MembershipRepository(BaseRepository[Membership]):
             .join(UserProfile, UserProfile.id == Membership.user_id)
             .where(Membership.org_id == org_id)
             .where(Membership.status == MembershipStatus.ACTIVE)
-            .where(self._not_deleted())
             .order_by(Membership.created_at.asc())
         )
         result = await self.session.execute(stmt)
@@ -129,7 +127,6 @@ class MembershipRepository(BaseRepository[Membership]):
             .where(Membership.org_id == org_id)
             .where(Membership.role == Role.OWNER)
             .where(Membership.status == MembershipStatus.ACTIVE)
-            .where(self._not_deleted())
         )
         result = await self.session.execute(stmt)
         return result.scalar_one()
@@ -147,7 +144,6 @@ class MembershipRepository(BaseRepository[Membership]):
         stmt = (
             select(Membership)
             .where(Membership.user_id == user_id)
-            .where(self._not_deleted())
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
