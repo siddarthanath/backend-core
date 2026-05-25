@@ -105,6 +105,7 @@ class MembershipRepository(BaseRepository[Membership]):
             .join(UserProfile, UserProfile.id == Membership.user_id)
             .where(Membership.org_id == org_id)
             .where(Membership.status == MembershipStatus.ACTIVE)
+            .where(UserProfile.deleted_at.is_(None))
             .order_by(Membership.created_at.asc())
         )
         result = await self.session.execute(stmt)
