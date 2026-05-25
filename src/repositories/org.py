@@ -84,9 +84,8 @@ class MembershipRepository(BaseRepository[Membership]):
             Membership | None: The membership record, or None.
 
         """
-        stmt = (
-            select(Membership)
-            .where(and_(Membership.user_id == user_id, Membership.org_id == org_id))
+        stmt = select(Membership).where(
+            and_(Membership.user_id == user_id, Membership.org_id == org_id)
         )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
@@ -141,10 +140,7 @@ class MembershipRepository(BaseRepository[Membership]):
             list[Membership]: All membership records for the user.
 
         """
-        stmt = (
-            select(Membership)
-            .where(Membership.user_id == user_id)
-        )
+        stmt = select(Membership).where(Membership.user_id == user_id)
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 

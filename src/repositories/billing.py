@@ -32,10 +32,7 @@ class SubscriptionRepository(BaseRepository[Subscription]):
             Subscription | None: The subscription, or None if the org has never had one.
 
         """
-        stmt = (
-            select(Subscription)
-            .where(Subscription.org_id == org_id)
-        )
+        stmt = select(Subscription).where(Subscription.org_id == org_id)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -51,9 +48,8 @@ class SubscriptionRepository(BaseRepository[Subscription]):
             Subscription | None: The matching subscription, or None.
 
         """
-        stmt = (
-            select(Subscription)
-            .where(Subscription.stripe_subscription_id == stripe_subscription_id)
+        stmt = select(Subscription).where(
+            Subscription.stripe_subscription_id == stripe_subscription_id
         )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
