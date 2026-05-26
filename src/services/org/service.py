@@ -10,7 +10,7 @@ import uuid
 # Private Library
 from src.configs.settings import app_settings
 from src.constants import MembershipStatus, Role
-from src.core.exceptions.types import ConflictError, ForbiddenError, NotFoundError
+from src.core.exceptions.types import AppValidationError, ConflictError, ForbiddenError, NotFoundError
 from src.models.org import Membership, Organisation
 from src.repositories.org import MembershipRepository, OrgRepository
 from src.repositories.user import UserRepository
@@ -335,7 +335,11 @@ class OrgService:
         return await self.membership_repo.update(membership, role=new_role)
 
     async def cleanup_for_deleted_user(self, user_id: uuid.UUID) -> None:
-        """Hard-delete orgs where this user is the sole owner.
+        """Hard-delete orgs where this user is the sole owner, then remove all memberships.
+
+        Raises AppValidationError (before any deletion) if the user is the sole owner of a
+        shared org — the org would become ownerless. The caller should surface this to the
+        user with a prompt to transfer ownership first.
 
         Called during account deletion before the user profile is removed.
         Subscriptions and memberships for deleted orgs cascade at the DB level.
@@ -343,17 +347,70 @@ class OrgService:
         Args:
             user_id (uuid.UUID): The user being deleted.
 
+        Raises:
+            AppValidationError: If the user is the sole owner of an org with other members.
+
         """
         memberships = await self.membership_repo.get_user_memberships(user_id)
         for membership in memberships:
             if membership.role == Role.OWNER:
                 if await self.membership_repo.count_owners(membership.org_id) == 1:
+                    active_count = await self.membership_repo.count_active_members(
+                        membership.org_id
+                    )
+                    if active_count > 1:
+                        # Other members would be stranded — block deletion.
+                        raise AppValidationError(
+                            "You are the sole owner of an organisation with other members. "
+                            "Transfer ownership before deleting your account."
+                        )
                     org = await self.org_repo.get_by_id(membership.org_id)
                     if org:
                         await self.org_repo.hard_delete(org)
         # Remove all remaining memberships (non-owner roles, invited status, etc.).
-        # Without this, hard-deleting the UserProfile FK would raise an IntegrityError.
+        # Without this, soft-deleting the UserProfile would leave orphaned FK rows.
         await self.membership_repo.delete_all_for_user(user_id)
+
+    async def transfer_ownership(
+        self,
+        org_id: uuid.UUID,
+        requester_id: uuid.UUID,
+        new_owner_id: uuid.UUID,
+    ) -> Membership:
+        """Transfer org ownership to another active member. Requester is demoted to ADMIN.
+
+        Args:
+            org_id (uuid.UUID): The org's UUID.
+            requester_id (uuid.UUID): The current owner transferring ownership.
+            new_owner_id (uuid.UUID): The member to promote to owner.
+
+        Raises:
+            ForbiddenError: If the requester is not an owner.
+            AppValidationError: If requester and target are the same user.
+            NotFoundError: If the target is not an active member of the org.
+
+        Returns:
+            Membership: The updated membership for the new owner.
+
+        """
+        if not await self.membership_repo.user_has_role(requester_id, org_id, Role.OWNER):
+            raise ForbiddenError("Only owners can transfer ownership")
+
+        if requester_id == new_owner_id:
+            raise AppValidationError("Cannot transfer ownership to yourself")
+
+        new_owner_membership = await self.membership_repo.get_membership(new_owner_id, org_id)
+        if not new_owner_membership or new_owner_membership.status != MembershipStatus.ACTIVE:
+            raise NotFoundError("Member", new_owner_id)
+
+        # Promote new owner first to avoid an ownerless window between the two updates.
+        await self.membership_repo.update(new_owner_membership, role=Role.OWNER)
+
+        requester_membership = await self.membership_repo.get_membership(requester_id, org_id)
+        if requester_membership:
+            await self.membership_repo.update(requester_membership, role=Role.ADMIN)
+
+        return new_owner_membership
 
     async def remove_member(
         self,

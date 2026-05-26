@@ -47,7 +47,13 @@ def upgrade() -> None:
     sa.Column('last_name', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_user_profiles_email'), 'user_profiles', ['email'], unique=True)
+    op.create_index(
+        "ix_user_profiles_email_active",
+        "user_profiles",
+        ["email"],
+        unique=True,
+        postgresql_where=sa.text("deleted_at IS NULL"),
+    )
     
     op.create_table('memberships',
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
@@ -158,7 +164,7 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_memberships_user_id'), table_name='memberships')
     op.drop_index(op.f('ix_memberships_org_id'), table_name='memberships')
     op.drop_table('memberships')
-    op.drop_index(op.f('ix_user_profiles_email'), table_name='user_profiles')
+    op.drop_index("ix_user_profiles_email_active", table_name="user_profiles")
     op.drop_table('user_profiles')
     op.drop_index(op.f('ix_organisations_stripe_customer_id'), table_name='organisations')
     op.drop_index(op.f('ix_organisations_slug'), table_name='organisations')

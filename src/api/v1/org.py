@@ -14,6 +14,7 @@ from src.core.middleware.rate_limit import limiter
 from src.schemas.common import MessageResponse
 from src.schemas.org.requests import (
     InviteMemberRequest,
+    TransferOwnershipRequest,
     UpdateMemberRoleRequest,
     UpdateOrgRequest,
 )
@@ -137,6 +138,22 @@ async def update_member_role(
         requester_id=user_id,
         target_user_id=target_user_id,
         new_role=body.role,
+    )
+    return MemberResponse.model_validate(membership)
+
+
+@router.post("/{org_id}/transfer-ownership", response_model=MemberResponse)
+@limiter.limit("10/minute")
+async def transfer_ownership(
+    request: Request,
+    org_id: uuid.UUID,
+    body: TransferOwnershipRequest,
+    user_id: CurrentUserID,
+    service: OrgSvc,
+) -> MemberResponse:
+    """Transfer org ownership to another active member. Requester is demoted to ADMIN."""
+    membership = await service.transfer_ownership(
+        org_id, requester_id=user_id, new_owner_id=body.new_owner_id
     )
     return MemberResponse.model_validate(membership)
 

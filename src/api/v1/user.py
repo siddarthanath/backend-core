@@ -163,8 +163,9 @@ async def delete_account(
       user can still log in and contact support. No Stripe subscriptions are orphaned
       because org deletion cascades subscription rows at the DB level.
     - If Supabase auth delete fails after DB is cleared: user has no profile or
-      memberships so they cannot access any data. The orphaned auth record is benign —
-      their next login attempt creates a fresh profile via upsert_from_supabase.
+      memberships so they cannot access any data. The orphaned Supabase auth record
+      means re-login still issues a JWT, but upsert_from_supabase raises AccountDeletedError
+      — the user sees "contact support" and cannot access anything.
 
     body.confirmation must equal "DELETE MY ACCOUNT".
 

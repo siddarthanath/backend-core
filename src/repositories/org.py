@@ -111,6 +111,25 @@ class MembershipRepository(BaseRepository[Membership]):
         result = await self.session.execute(stmt)
         return [(row.Membership, row.email) for row in result.all()]
 
+    async def count_active_members(self, org_id: uuid.UUID) -> int:
+        """Count all active memberships in the org (all roles).
+
+        Args:
+            org_id (uuid.UUID): The org's UUID.
+
+        Returns:
+            int: Number of active members.
+
+        """
+        stmt = (
+            select(func.count())
+            .select_from(Membership)
+            .where(Membership.org_id == org_id)
+            .where(Membership.status == MembershipStatus.ACTIVE)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one()
+
     async def count_owners(self, org_id: uuid.UUID) -> int:
         """Count active OWNER memberships in the org.
 
