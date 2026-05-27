@@ -352,6 +352,9 @@ class OrgService:
 
         """
         memberships = await self.membership_repo.get_user_memberships(user_id)
+
+        # Validate all orgs before touching anything — prevents partial deletion if
+        # the user is sole owner of multiple orgs and only the second one fails.
         for membership in memberships:
             if membership.role == Role.OWNER:
                 if await self.membership_repo.count_owners(membership.org_id) == 1:
@@ -359,11 +362,14 @@ class OrgService:
                         membership.org_id
                     )
                     if active_count > 1:
-                        # Other members would be stranded — block deletion.
                         raise AppValidationError(
                             "You are the sole owner of an organisation with other members. "
                             "Transfer ownership before deleting your account."
                         )
+
+        for membership in memberships:
+            if membership.role == Role.OWNER:
+                if await self.membership_repo.count_owners(membership.org_id) == 1:
                     org = await self.org_repo.get_by_id(membership.org_id)
                     if org:
                         await self.org_repo.hard_delete(org)

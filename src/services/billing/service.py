@@ -515,6 +515,11 @@ class BillingOrchestrator:
 
         sub = await self.subscription_repo.get_by_org(org_id)
         if not sub:
+            log.error(
+                "billing.subscription_created_missing_sub",
+                org_id=org_id_str,
+                stripe_sub_id=stripe_sub_id,
+            )
             return
 
         item = data["items"]["data"][0]
@@ -579,17 +584,15 @@ class BillingOrchestrator:
             cancel_at_period_end=cancel_at_period_end,
         )
 
-        update_fields: dict[str, object] = dict(
+        await self.subscription_repo.update(
+            sub,
             plan=plan,
             status=status,
             stripe_price_id=price_id,
             current_period_end=period_end,
             cancel_at_period_end=cancel_at_period_end,
+            cancellation_reason=cancellation_reason if cancel_at_period_end else None,
         )
-        if cancel_at_period_end and cancellation_reason:
-            update_fields["cancellation_reason"] = cancellation_reason
-
-        await self.subscription_repo.update(sub, **update_fields)
 
     async def _on_subscription_deleted(self, data: dict) -> None:
         stripe_sub_id: str = data.get("id", "")
