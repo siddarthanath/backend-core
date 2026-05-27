@@ -750,4 +750,3 @@ class TestSubscriptionCreated:
             await orchestrator.handle_webhook(b"payload", "sig")
 
         subscription_repo.update.assert_not_awaited()
-

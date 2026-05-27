@@ -566,7 +566,9 @@ class BillingOrchestrator:
 
         # Stripe portal uses cancel_at (specific timestamp) rather than cancel_at_period_end
         # when "cancel at end of billing period" is configured — treat either as a scheduled cancel.
-        cancel_at_period_end = bool(data.get("cancel_at_period_end", False)) or bool(data.get("cancel_at"))
+        cancel_at_period_end = bool(data.get("cancel_at_period_end", False)) or bool(
+            data.get("cancel_at")
+        )
         cancellation_details = data.get("cancellation_details") or {}
         cancellation_reason: str | None = None
         if cancel_at_period_end:

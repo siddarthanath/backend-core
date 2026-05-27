@@ -10,7 +10,12 @@ import uuid
 # Private Library
 from src.configs.settings import app_settings
 from src.constants import MembershipStatus, Role
-from src.core.exceptions.types import AppValidationError, ConflictError, ForbiddenError, NotFoundError
+from src.core.exceptions.types import (
+    AppValidationError,
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+)
 from src.models.org import Membership, Organisation
 from src.repositories.org import MembershipRepository, OrgRepository
 from src.repositories.user import UserRepository
@@ -399,20 +404,29 @@ class OrgService:
             Membership: The updated membership for the new owner.
 
         """
-        if not await self.membership_repo.user_has_role(requester_id, org_id, Role.OWNER):
+        if not await self.membership_repo.user_has_role(
+            requester_id, org_id, Role.OWNER
+        ):
             raise ForbiddenError("Only owners can transfer ownership")
 
         if requester_id == new_owner_id:
             raise AppValidationError("Cannot transfer ownership to yourself")
 
-        new_owner_membership = await self.membership_repo.get_membership(new_owner_id, org_id)
-        if not new_owner_membership or new_owner_membership.status != MembershipStatus.ACTIVE:
+        new_owner_membership = await self.membership_repo.get_membership(
+            new_owner_id, org_id
+        )
+        if (
+            not new_owner_membership
+            or new_owner_membership.status != MembershipStatus.ACTIVE
+        ):
             raise NotFoundError("Member", new_owner_id)
 
         # Promote new owner first to avoid an ownerless window between the two updates.
         await self.membership_repo.update(new_owner_membership, role=Role.OWNER)
 
-        requester_membership = await self.membership_repo.get_membership(requester_id, org_id)
+        requester_membership = await self.membership_repo.get_membership(
+            requester_id, org_id
+        )
         if requester_membership:
             await self.membership_repo.update(requester_membership, role=Role.ADMIN)
 
