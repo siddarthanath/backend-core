@@ -61,11 +61,13 @@ async def get_current_user(
     except jwt.InvalidTokenError:
         raise AuthException(message="Invalid token")
 
+    meta = payload.get("user_metadata", {})
     claims = UserClaims(
         sub=payload["sub"],
         email=payload.get("email", ""),
         role=payload.get("role", "authenticated"),
-        full_name=payload.get("user_metadata", {}).get("full_name"),
+        first_name=meta.get("first_name"),
+        last_name=meta.get("last_name"),
     )
     set_request_user_id(claims.sub)
     # Bind to user to flow into all downstream logs

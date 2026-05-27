@@ -50,7 +50,10 @@ async def get_me(
     """
     user_id = uuid.UUID(claims.sub)
     user = await service.get_or_create(
-        user_id, email=claims.email, full_name=claims.full_name
+        user_id,
+        email=claims.email,
+        first_name=claims.first_name,
+        last_name=claims.last_name,
     )
     await org_service.get_or_create_personal(user_id, email=claims.email)
     orgs = await org_service.list_my_orgs(user_id)
