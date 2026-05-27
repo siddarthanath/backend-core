@@ -89,14 +89,18 @@ def make_subscription(**kwargs):
 
 
 def make_stripe_subscription_dict(
-    *, price_id: str = "price_pro_monthly", period_end: int = 9999999999
+    *,
+    price_id: str = "price_pro_monthly",
+    period_end: int = 9999999999,
+    org_id: str = "",
 ) -> dict:
-    """Return a minimal dict shaped like stripe.Subscription.to_dict()."""
+    """Return a minimal dict shaped like a Stripe Subscription object."""
     return {
         "id": "sub_test123",
         "status": "active",
         "cancel_at_period_end": False,
         "current_period_end": period_end,
+        "metadata": {"org_id": org_id} if org_id else {},
         "items": {
             "data": [
                 {
@@ -435,15 +439,17 @@ class TestHandleWebhook:
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_checkout_completed_activates_subscription(self) -> None:
+    async def test_checkout_completed_does_not_activate_subscription(self) -> None:
+        # Subscription activation is handled by customer.subscription.created.
+        # checkout.session.completed only maps the stripe_customer_id to the org.
         orchestrator, subscription_repo, org_repo, _, billing_svc, _ = (
             make_orchestrator()
         )
         org_id = uuid.uuid4()
         org = make_org(id=org_id, stripe_customer_id=None)
-        sub = make_subscription(org_id=org_id, plan=Plan.FREE)
 
         billing_svc.parse_webhook.return_value = {
+            "id": "evt_checkout",
             "type": "checkout.session.completed",
             "data": {
                 "object": {
@@ -454,37 +460,20 @@ class TestHandleWebhook:
             },
         }
         org_repo.get_by_id.return_value = org
-        subscription_repo.get_by_org.return_value = sub
 
-        stripe_sub_dict = make_stripe_subscription_dict(price_id="price_pro_monthly")
-        with patch(
-            "src.services.billing.service._build_price_map",
-            return_value={(Plan.PRO, BillingPeriod.MONTHLY): "price_pro_monthly"},
-        ):
-            with patch(
-                "anyio.to_thread.run_sync",
-                new_callable=AsyncMock,
-                return_value=MagicMock(to_dict=lambda: stripe_sub_dict),
-            ):
-                await orchestrator.handle_webhook(b"payload", "sig")
+        await orchestrator.handle_webhook(b"payload", "sig")
 
-        subscription_repo.update.assert_awaited_once()
-        _, kwargs = subscription_repo.update.call_args
-        assert kwargs["plan"] == Plan.PRO
-        assert kwargs["status"] == SubscriptionStatus.ACTIVE
-        assert kwargs["stripe_subscription_id"] == "sub_test123"
+        subscription_repo.update.assert_not_awaited()
 
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_checkout_completed_writes_stripe_customer_id_to_org(self) -> None:
-        orchestrator, subscription_repo, org_repo, _, billing_svc, _ = (
-            make_orchestrator()
-        )
+        orchestrator, _, org_repo, _, billing_svc, _ = make_orchestrator()
         org_id = uuid.uuid4()
         org = make_org(id=org_id, stripe_customer_id=None)
-        sub = make_subscription(org_id=org_id)
 
         billing_svc.parse_webhook.return_value = {
+            "id": "evt_checkout",
             "type": "checkout.session.completed",
             "data": {
                 "object": {
@@ -495,19 +484,8 @@ class TestHandleWebhook:
             },
         }
         org_repo.get_by_id.return_value = org
-        subscription_repo.get_by_org.return_value = sub
 
-        stripe_sub_dict = make_stripe_subscription_dict()
-        with patch(
-            "src.services.billing.service._build_price_map",
-            return_value={(Plan.PRO, BillingPeriod.MONTHLY): "price_pro_monthly"},
-        ):
-            with patch(
-                "anyio.to_thread.run_sync",
-                new_callable=AsyncMock,
-                return_value=MagicMock(to_dict=lambda: stripe_sub_dict),
-            ):
-                await orchestrator.handle_webhook(b"payload", "sig")
+        await orchestrator.handle_webhook(b"payload", "sig")
 
         org_repo.update.assert_awaited_once_with(org, stripe_customer_id="cus_new123")
 
@@ -516,14 +494,12 @@ class TestHandleWebhook:
     async def test_checkout_completed_skips_customer_update_if_already_set(
         self,
     ) -> None:
-        orchestrator, subscription_repo, org_repo, _, billing_svc, _ = (
-            make_orchestrator()
-        )
+        orchestrator, _, org_repo, _, billing_svc, _ = make_orchestrator()
         org_id = uuid.uuid4()
         org = make_org(id=org_id, stripe_customer_id="cus_existing")
-        sub = make_subscription(org_id=org_id)
 
         billing_svc.parse_webhook.return_value = {
+            "id": "evt_checkout",
             "type": "checkout.session.completed",
             "data": {
                 "object": {
@@ -534,19 +510,8 @@ class TestHandleWebhook:
             },
         }
         org_repo.get_by_id.return_value = org
-        subscription_repo.get_by_org.return_value = sub
 
-        stripe_sub_dict = make_stripe_subscription_dict()
-        with patch(
-            "src.services.billing.service._build_price_map",
-            return_value={(Plan.PRO, BillingPeriod.MONTHLY): "price_pro_monthly"},
-        ):
-            with patch(
-                "anyio.to_thread.run_sync",
-                new_callable=AsyncMock,
-                return_value=MagicMock(to_dict=lambda: stripe_sub_dict),
-            ):
-                await orchestrator.handle_webhook(b"payload", "sig")
+        await orchestrator.handle_webhook(b"payload", "sig")
 
         org_repo.update.assert_not_awaited()
 
@@ -557,6 +522,7 @@ class TestHandleWebhook:
             make_orchestrator()
         )
         billing_svc.parse_webhook.return_value = {
+            "id": "evt_checkout",
             "type": "checkout.session.completed",
             "data": {
                 "object": {
@@ -653,39 +619,134 @@ class TestHandleWebhook:
 
         subscription_repo.update.assert_not_awaited()
 
+
+class TestSubscriptionCreated:
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_activates_subscription_from_event_data(self) -> None:
+        orchestrator, subscription_repo, _, _, billing_svc, _ = make_orchestrator()
+        org_id = uuid.uuid4()
+        sub = make_subscription(org_id=org_id, plan=Plan.FREE)
+        subscription_repo.get_by_org.return_value = sub
+
+        billing_svc.parse_webhook.return_value = {
+            "id": "evt_sub_created",
+            "type": "customer.subscription.created",
+            "data": {
+                "object": make_stripe_subscription_dict(
+                    price_id="price_pro_monthly",
+                    period_end=9999999999,
+                    org_id=str(org_id),
+                )
+            },
+        }
+
+        with patch(
+            "src.services.billing.service._build_price_map",
+            return_value={(Plan.PRO, BillingPeriod.MONTHLY): "price_pro_monthly"},
+        ):
+            await orchestrator.handle_webhook(b"payload", "sig")
+
+        subscription_repo.update.assert_awaited_once()
+        _, kwargs = subscription_repo.update.call_args
+        assert kwargs["plan"] == Plan.PRO
+        assert kwargs["status"] == SubscriptionStatus.ACTIVE
+        assert kwargs["stripe_subscription_id"] == "sub_test123"
+        assert kwargs["current_period_end"] is not None
+
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_handles_missing_current_period_end_gracefully(self) -> None:
+        orchestrator, subscription_repo, _, _, billing_svc, _ = make_orchestrator()
+        org_id = uuid.uuid4()
+        sub = make_subscription(org_id=org_id, plan=Plan.FREE)
+        subscription_repo.get_by_org.return_value = sub
+
+        sub_data = make_stripe_subscription_dict(
+            price_id="price_pro_monthly", org_id=str(org_id)
+        )
+        del sub_data["current_period_end"]
+
+        billing_svc.parse_webhook.return_value = {
+            "id": "evt_sub_created",
+            "type": "customer.subscription.created",
+            "data": {"object": sub_data},
+        }
+
+        with patch(
+            "src.services.billing.service._build_price_map",
+            return_value={(Plan.PRO, BillingPeriod.MONTHLY): "price_pro_monthly"},
+        ):
+            await orchestrator.handle_webhook(b"payload", "sig")
+
+        _, kwargs = subscription_repo.update.call_args
+        assert kwargs["current_period_end"] is None
+        assert kwargs["status"] == SubscriptionStatus.ACTIVE
+
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_does_nothing_if_no_org_id_in_metadata(self) -> None:
+        orchestrator, subscription_repo, _, _, billing_svc, _ = make_orchestrator()
+
+        sub_data = make_stripe_subscription_dict(price_id="price_pro_monthly")
+        # no org_id in metadata
+        sub_data["metadata"] = {}
+
+        billing_svc.parse_webhook.return_value = {
+            "id": "evt_sub_created",
+            "type": "customer.subscription.created",
+            "data": {"object": sub_data},
+        }
+
+        await orchestrator.handle_webhook(b"payload", "sig")
+
+        subscription_repo.update.assert_not_awaited()
+
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_does_nothing_if_subscription_not_found(self) -> None:
+        orchestrator, subscription_repo, _, _, billing_svc, _ = make_orchestrator()
+        org_id = uuid.uuid4()
+        subscription_repo.get_by_org.return_value = None
+
+        billing_svc.parse_webhook.return_value = {
+            "id": "evt_sub_created",
+            "type": "customer.subscription.created",
+            "data": {
+                "object": make_stripe_subscription_dict(
+                    price_id="price_pro_monthly", org_id=str(org_id)
+                )
+            },
+        }
+
+        with patch(
+            "src.services.billing.service._build_price_map",
+            return_value={(Plan.PRO, BillingPeriod.MONTHLY): "price_pro_monthly"},
+        ):
+            await orchestrator.handle_webhook(b"payload", "sig")
+
+        subscription_repo.update.assert_not_awaited()
+
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_unknown_price_id_does_not_raise_or_retry(self) -> None:
         # If _plan_from_price raises ValueError (misconfigured price ID), the webhook
         # must return cleanly — not propagate the error and trigger infinite Stripe retries.
-        orchestrator, subscription_repo, org_repo, _, billing_svc, _ = (
-            make_orchestrator()
-        )
+        orchestrator, subscription_repo, _, _, billing_svc, _ = make_orchestrator()
         org_id = uuid.uuid4()
-        org = make_org(id=org_id)
-        sub = make_subscription(org_id=org_id)
+        subscription_repo.get_by_org.return_value = make_subscription(org_id=org_id)
 
         billing_svc.parse_webhook.return_value = {
-            "type": "checkout.session.completed",
+            "id": "evt_sub_created",
+            "type": "customer.subscription.created",
             "data": {
-                "object": {
-                    "metadata": {"org_id": str(org_id)},
-                    "subscription": "sub_test123",
-                    "customer": "cus_test123",
-                }
+                "object": make_stripe_subscription_dict(
+                    price_id="price_unknown_id", org_id=str(org_id)
+                )
             },
         }
-        org_repo.get_by_id.return_value = org
-        subscription_repo.get_by_org.return_value = sub
 
-        stripe_sub_dict = make_stripe_subscription_dict(price_id="price_unknown_id")
         with patch("src.services.billing.service._build_price_map", return_value={}):
-            with patch(
-                "anyio.to_thread.run_sync",
-                new_callable=AsyncMock,
-                return_value=MagicMock(to_dict=lambda: stripe_sub_dict),
-            ):
-                # Must not raise — Stripe would retry on any non-200 response.
-                await orchestrator.handle_webhook(b"payload", "sig")
+            await orchestrator.handle_webhook(b"payload", "sig")
 
         subscription_repo.update.assert_not_awaited()

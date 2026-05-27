@@ -11,7 +11,12 @@ import pytest
 
 # Private Library
 from src.constants import MembershipStatus, Role
-from src.core.exceptions.types import ConflictError, ForbiddenError, NotFoundError
+from src.core.exceptions.types import (
+    AppValidationError,
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+)
 from src.repositories.org import MembershipRepository, OrgRepository
 from src.repositories.user import UserRepository
 from src.services.org.service import OrgService
@@ -319,6 +324,23 @@ class TestRemoveMember:
 class TestCleanupForDeletedUser:
     @pytest.mark.unit
     @pytest.mark.asyncio
+    async def test_raises_validation_error_when_sole_owner_of_shared_org(self) -> None:
+        service, org_repo, membership_repo, _ = make_service()
+        user_id = uuid.uuid4()
+        org_id = uuid.uuid4()
+        membership = make_membership(user_id=user_id, org_id=org_id, role=Role.OWNER)
+
+        membership_repo.get_user_memberships.return_value = [membership]
+        membership_repo.count_owners.return_value = 1
+        membership_repo.count_active_members.return_value = 2  # owner + 1 other member
+
+        with pytest.raises(AppValidationError):
+            await service.cleanup_for_deleted_user(user_id)
+
+        org_repo.hard_delete.assert_not_awaited()
+
+    @pytest.mark.unit
+    @pytest.mark.asyncio
     async def test_hard_deletes_sole_owned_org(self) -> None:
         service, org_repo, membership_repo, _ = make_service()
         user_id = uuid.uuid4()
@@ -328,6 +350,7 @@ class TestCleanupForDeletedUser:
 
         membership_repo.get_user_memberships.return_value = [membership]
         membership_repo.count_owners.return_value = 1
+        membership_repo.count_active_members.return_value = 1  # only the owner
         org_repo.get_by_id.return_value = org
 
         await service.cleanup_for_deleted_user(user_id)
@@ -400,9 +423,92 @@ class TestCleanupForDeletedUser:
 
         membership_repo.get_user_memberships.return_value = [owner_membership]
         membership_repo.count_owners.return_value = 1
+        membership_repo.count_active_members.return_value = 1  # only the owner
         org_repo.get_by_id.return_value = org
 
         await service.cleanup_for_deleted_user(user_id)
 
         org_repo.hard_delete.assert_awaited_once_with(org)
         membership_repo.delete_all_for_user.assert_awaited_once_with(user_id)
+
+
+class TestTransferOwnership:
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_raises_forbidden_for_non_owner(self) -> None:
+        service, _, membership_repo, _ = make_service()
+        membership_repo.user_has_role.return_value = False
+
+        with pytest.raises(ForbiddenError):
+            await service.transfer_ownership(
+                uuid.uuid4(), requester_id=uuid.uuid4(), new_owner_id=uuid.uuid4()
+            )
+
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_raises_validation_error_when_transferring_to_self(self) -> None:
+        service, _, membership_repo, _ = make_service()
+        membership_repo.user_has_role.return_value = True
+        user_id = uuid.uuid4()
+
+        with pytest.raises(AppValidationError):
+            await service.transfer_ownership(
+                uuid.uuid4(), requester_id=user_id, new_owner_id=user_id
+            )
+
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_raises_not_found_when_target_not_a_member(self) -> None:
+        service, _, membership_repo, _ = make_service()
+        membership_repo.user_has_role.return_value = True
+        membership_repo.get_membership.return_value = None
+
+        with pytest.raises(NotFoundError):
+            await service.transfer_ownership(
+                uuid.uuid4(), requester_id=uuid.uuid4(), new_owner_id=uuid.uuid4()
+            )
+
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_raises_not_found_when_target_is_invited(self) -> None:
+        service, _, membership_repo, _ = make_service()
+        membership_repo.user_has_role.return_value = True
+        membership_repo.get_membership.return_value = make_membership(
+            status=MembershipStatus.INVITED
+        )
+
+        with pytest.raises(NotFoundError):
+            await service.transfer_ownership(
+                uuid.uuid4(), requester_id=uuid.uuid4(), new_owner_id=uuid.uuid4()
+            )
+
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    async def test_promotes_new_owner_and_demotes_requester(self) -> None:
+        service, _, membership_repo, _ = make_service()
+        requester_id = uuid.uuid4()
+        new_owner_id = uuid.uuid4()
+        new_owner_membership = make_membership(
+            user_id=new_owner_id, role=Role.MEMBER, status=MembershipStatus.ACTIVE
+        )
+        requester_membership = make_membership(
+            user_id=requester_id, role=Role.OWNER, status=MembershipStatus.ACTIVE
+        )
+
+        membership_repo.user_has_role.return_value = True
+        # First get_membership: new owner. Second: requester (post-promotion lookup).
+        membership_repo.get_membership.side_effect = [
+            new_owner_membership,
+            requester_membership,
+        ]
+        membership_repo.update.return_value = new_owner_membership
+
+        result = await service.transfer_ownership(
+            uuid.uuid4(), requester_id=requester_id, new_owner_id=new_owner_id
+        )
+
+        assert result is new_owner_membership
+        first_update = membership_repo.update.call_args_list[0]
+        assert first_update[1]["role"] == Role.OWNER
+        second_update = membership_repo.update.call_args_list[1]
+        assert second_update[1]["role"] == Role.ADMIN

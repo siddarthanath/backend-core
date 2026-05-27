@@ -4,6 +4,7 @@
 
 # Standard Library
 import re
+import uuid
 
 # Third-Party Library
 from pydantic import BaseModel, EmailStr, field_validator
@@ -46,3 +47,9 @@ class UpdateMemberRoleRequest(BaseModel):
     """Change a member's role. Only owners can perform this."""
 
     role: Role
+
+
+class TransferOwnershipRequest(BaseModel):
+    """Transfer org ownership to an existing active member."""
+
+    new_owner_id: uuid.UUID

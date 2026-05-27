@@ -13,8 +13,8 @@ from src.core.dependencies import CurrentUserID, OrgSvc
 from src.core.middleware.rate_limit import limiter
 from src.schemas.common import MessageResponse
 from src.schemas.org.requests import (
-    CreateOrgRequest,
     InviteMemberRequest,
+    TransferOwnershipRequest,
     UpdateMemberRoleRequest,
     UpdateOrgRequest,
 )
@@ -25,17 +25,21 @@ from src.schemas.org.responses import MemberResponse, OrgResponse
 router = APIRouter(prefix="/orgs", tags=["Organisations"])
 
 
-@router.post("", response_model=OrgResponse, status_code=201)
-@limiter.limit("10/minute")
-async def create_org(
-    request: Request,
-    body: CreateOrgRequest,
-    user_id: CurrentUserID,
-    service: OrgSvc,
-) -> OrgResponse:
-    """Create a new organisation. The caller becomes the owner automatically."""
-    org = await service.create_org(user_id, name=body.name, slug=body.slug)
-    return OrgResponse.model_validate(org)
+# B2C: org creation is intentionally not exposed. Each user gets exactly one personal
+# org, auto-created on first login via get_or_create_personal_org. Re-enable this
+# endpoint when adding B2B workspace support (multiple orgs per user, team invites).
+#
+# @router.post("", response_model=OrgResponse, status_code=201)
+# @limiter.limit("10/minute")
+# async def create_org(
+#     request: Request,
+#     body: CreateOrgRequest,
+#     user_id: CurrentUserID,
+#     service: OrgSvc,
+# ) -> OrgResponse:
+#     """Create a new organisation. The caller becomes the owner automatically."""
+#     org = await service.create_org(user_id, name=body.name, slug=body.slug)
+#     return OrgResponse.model_validate(org)
 
 
 @router.get("", response_model=list[OrgResponse])
@@ -134,6 +138,22 @@ async def update_member_role(
         requester_id=user_id,
         target_user_id=target_user_id,
         new_role=body.role,
+    )
+    return MemberResponse.model_validate(membership)
+
+
+@router.post("/{org_id}/transfer-ownership", response_model=MemberResponse)
+@limiter.limit("10/minute")
+async def transfer_ownership(
+    request: Request,
+    org_id: uuid.UUID,
+    body: TransferOwnershipRequest,
+    user_id: CurrentUserID,
+    service: OrgSvc,
+) -> MemberResponse:
+    """Transfer org ownership to another active member. Requester is demoted to ADMIN."""
+    membership = await service.transfer_ownership(
+        org_id, requester_id=user_id, new_owner_id=body.new_owner_id
     )
     return MemberResponse.model_validate(membership)
 

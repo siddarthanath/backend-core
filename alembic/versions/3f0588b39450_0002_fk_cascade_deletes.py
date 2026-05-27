@@ -13,8 +13,8 @@ from alembic import op
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
-revision: str = '3f0588b39450'
-down_revision: str | None = '2f0588b39450'
+revision: str = "3f0588b39450"
+down_revision: str | None = "2f0588b39450"
 branch_labels: str | None = None
 depends_on: str | None = None
 
@@ -29,27 +29,35 @@ def upgrade() -> None:
     # memberships.invited_by is intentionally left without CASCADE — deleting the inviter
     # should not cascade-delete the invited member's membership.
 
-    op.drop_constraint('memberships_user_id_fkey', 'memberships', type_='foreignkey')
+    op.drop_constraint("memberships_user_id_fkey", "memberships", type_="foreignkey")
     op.create_foreign_key(
-        'memberships_user_id_fkey', 'memberships',
-        'user_profiles', ['user_id'], ['id'],
-        ondelete='CASCADE',
+        "memberships_user_id_fkey",
+        "memberships",
+        "user_profiles",
+        ["user_id"],
+        ["id"],
+        ondelete="CASCADE",
     )
 
-    op.drop_constraint('memberships_org_id_fkey', 'memberships', type_='foreignkey')
+    op.drop_constraint("memberships_org_id_fkey", "memberships", type_="foreignkey")
     op.create_foreign_key(
-        'memberships_org_id_fkey', 'memberships',
-        'organisations', ['org_id'], ['id'],
-        ondelete='CASCADE',
+        "memberships_org_id_fkey",
+        "memberships",
+        "organisations",
+        ["org_id"],
+        ["id"],
+        ondelete="CASCADE",
     )
 
-    op.drop_constraint('subscriptions_org_id_fkey', 'subscriptions', type_='foreignkey')
+    op.drop_constraint("subscriptions_org_id_fkey", "subscriptions", type_="foreignkey")
     op.create_foreign_key(
-        'subscriptions_org_id_fkey', 'subscriptions',
-        'organisations', ['org_id'], ['id'],
-        ondelete='CASCADE',
+        "subscriptions_org_id_fkey",
+        "subscriptions",
+        "organisations",
+        ["org_id"],
+        ["id"],
+        ondelete="CASCADE",
     )
-
 
     # Email sync trigger — keeps user_profiles.email in sync with auth.users.email
     # automatically after Supabase confirms an email change. No application code required.
@@ -81,20 +89,29 @@ def downgrade() -> None:
     op.execute("drop trigger if exists on_auth_email_change on auth.users;")
     op.execute("drop function if exists sync_user_email();")
 
-    op.drop_constraint('subscriptions_org_id_fkey', 'subscriptions', type_='foreignkey')
+    op.drop_constraint("subscriptions_org_id_fkey", "subscriptions", type_="foreignkey")
     op.create_foreign_key(
-        'subscriptions_org_id_fkey', 'subscriptions',
-        'organisations', ['org_id'], ['id'],
+        "subscriptions_org_id_fkey",
+        "subscriptions",
+        "organisations",
+        ["org_id"],
+        ["id"],
     )
 
-    op.drop_constraint('memberships_org_id_fkey', 'memberships', type_='foreignkey')
+    op.drop_constraint("memberships_org_id_fkey", "memberships", type_="foreignkey")
     op.create_foreign_key(
-        'memberships_org_id_fkey', 'memberships',
-        'organisations', ['org_id'], ['id'],
+        "memberships_org_id_fkey",
+        "memberships",
+        "organisations",
+        ["org_id"],
+        ["id"],
     )
 
-    op.drop_constraint('memberships_user_id_fkey', 'memberships', type_='foreignkey')
+    op.drop_constraint("memberships_user_id_fkey", "memberships", type_="foreignkey")
     op.create_foreign_key(
-        'memberships_user_id_fkey', 'memberships',
-        'user_profiles', ['user_id'], ['id'],
+        "memberships_user_id_fkey",
+        "memberships",
+        "user_profiles",
+        ["user_id"],
+        ["id"],
     )
