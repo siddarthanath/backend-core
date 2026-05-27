@@ -6,7 +6,6 @@
 import uuid
 
 # Third-Party Library
-import sqlalchemy as sa
 from sqlalchemy import Index, text
 from sqlmodel import Field, SQLModel
 
