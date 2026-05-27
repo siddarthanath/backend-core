@@ -113,7 +113,7 @@ class OrgService:
         await self.get_org(org_id, user_id)
         rows = await self.membership_repo.get_org_members(org_id)
         return [
-            MemberResponse.model_validate(membership, update={"email": email})
+            MemberResponse.model_validate(membership, from_attributes=True).model_copy(update={"email": email})
             for membership, email in rows
         ]
 
