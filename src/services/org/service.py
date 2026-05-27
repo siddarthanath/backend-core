@@ -361,23 +361,21 @@ class OrgService:
         # Validate all orgs before touching anything — prevents partial deletion if
         # the user is sole owner of multiple orgs and only the second one fails.
         for membership in memberships:
-            if membership.role == Role.OWNER:
-                if await self.membership_repo.count_owners(membership.org_id) == 1:
-                    active_count = await self.membership_repo.count_active_members(
-                        membership.org_id
-                    )
-                    if active_count > 1:
-                        raise AppValidationError(
-                            "You are the sole owner of an organisation with other members. "
-                            "Transfer ownership before deleting your account."
-                        )
+            if (
+                membership.role == Role.OWNER
+                and await self.membership_repo.count_owners(membership.org_id) == 1
+                and await self.membership_repo.count_active_members(membership.org_id) > 1
+            ):
+                raise AppValidationError(
+                    "You are the sole owner of an organisation with other members. "
+                    "Transfer ownership before deleting your account."
+                )
 
         for membership in memberships:
-            if membership.role == Role.OWNER:
-                if await self.membership_repo.count_owners(membership.org_id) == 1:
-                    org = await self.org_repo.get_by_id(membership.org_id)
-                    if org:
-                        await self.org_repo.hard_delete(org)
+            if membership.role == Role.OWNER and await self.membership_repo.count_owners(membership.org_id) == 1:
+                org = await self.org_repo.get_by_id(membership.org_id)
+                if org:
+                    await self.org_repo.hard_delete(org)
         # Remove all remaining memberships (non-owner roles, invited status, etc.).
         # Without this, soft-deleting the UserProfile would leave orphaned FK rows.
         await self.membership_repo.delete_all_for_user(user_id)
