@@ -5,7 +5,6 @@
 # Standard Library
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
 
 # Third-Party Library
 import sqlalchemy as sa
@@ -39,7 +38,7 @@ class TimestampMixin(SQLModel):
 class SoftDeleteMixin(SQLModel):
     """Adds soft-delete support via a nullable deleted_at timestamp."""
 
-    deleted_at: Optional[datetime] = Field(
+    deleted_at: datetime | None = Field(
         default=None, sa_type=sa.DateTime(timezone=True)
     )
 

@@ -113,7 +113,16 @@ class OrgService:
         await self.get_org(org_id, user_id)
         rows = await self.membership_repo.get_org_members(org_id)
         return [
-            MemberResponse.model_validate(membership, from_attributes=True).model_copy(update={"email": email})
+            MemberResponse(
+                id=membership.id,
+                user_id=membership.user_id,
+                org_id=membership.org_id,
+                role=membership.role,
+                status=membership.status,
+                invited_by=membership.invited_by,
+                email=email,
+                created_at=membership.created_at,
+            )
             for membership, email in rows
         ]
 
@@ -360,19 +369,23 @@ class OrgService:
 
         # Validate all orgs before touching anything — prevents partial deletion if
         # the user is sole owner of multiple orgs and only the second one fails.
+        # Cache owner counts so the deletion loop reuses them without extra DB queries.
+        owner_counts: dict[uuid.UUID, int] = {}
         for membership in memberships:
-            if (
-                membership.role == Role.OWNER
-                and await self.membership_repo.count_owners(membership.org_id) == 1
-                and await self.membership_repo.count_active_members(membership.org_id) > 1
-            ):
-                raise AppValidationError(
-                    "You are the sole owner of an organisation with other members. "
-                    "Transfer ownership before deleting your account."
-                )
+            if membership.role == Role.OWNER:
+                count = await self.membership_repo.count_owners(membership.org_id)
+                owner_counts[membership.org_id] = count
+                if (
+                    count == 1
+                    and await self.membership_repo.count_active_members(membership.org_id) > 1
+                ):
+                    raise AppValidationError(
+                        "You are the sole owner of an organisation with other members. "
+                        "Transfer ownership before deleting your account."
+                    )
 
         for membership in memberships:
-            if membership.role == Role.OWNER and await self.membership_repo.count_owners(membership.org_id) == 1:
+            if membership.role == Role.OWNER and owner_counts.get(membership.org_id) == 1:
                 org = await self.org_repo.get_by_id(membership.org_id)
                 if org:
                     await self.org_repo.hard_delete(org)

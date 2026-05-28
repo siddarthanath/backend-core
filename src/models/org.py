@@ -4,7 +4,6 @@
 
 # Standard Library
 import uuid
-from typing import Optional
 
 # Third-Party Library
 import sqlalchemy as sa
@@ -31,7 +30,7 @@ class Organisation(UUIDMixin, TimestampMixin, SoftDeleteMixin, SQLModel, table=T
     name: str = Field(nullable=False, max_length=200)
     slug: str = Field(unique=True, index=True, nullable=False, max_length=100)
     is_personal: bool = Field(default=False)
-    stripe_customer_id: Optional[str] = Field(
+    stripe_customer_id: str | None = Field(
         default=None,
         unique=True,
         index=True,
@@ -72,7 +71,7 @@ class Membership(UUIDMixin, TimestampMixin, SQLModel, table=True):
         nullable=False,
         sa_type=sa.Enum(MembershipStatus, name="membershipstatus", create_type=True),
     )
-    invited_by: Optional[uuid.UUID] = Field(
+    invited_by: uuid.UUID | None = Field(
         default=None,
         foreign_key="user_profiles.id",
         description="UUID of the user who sent the invite",

@@ -5,7 +5,6 @@
 # Standard Library
 import uuid
 from datetime import datetime
-from typing import Optional
 
 # Third-Party Library
 from pydantic import BaseModel, Field
@@ -20,15 +19,15 @@ class AuditLogResponse(BaseModel):
 
     id: uuid.UUID = Field(description="Unique record identifier.")
     org_id: uuid.UUID = Field(description="Org this event belongs to.")
-    actor_id: Optional[uuid.UUID] = Field(
+    actor_id: uuid.UUID | None = Field(
         description="User who triggered the action; null for system-generated events."
     )
     action: str = Field(description="Dot-notation event name e.g. 'api_key.created'.")
     resource_type: str = Field(description="Entity type acted on e.g. 'api_key'.")
-    resource_id: Optional[str] = Field(
+    resource_id: str | None = Field(
         description="Stringified ID of the affected entity."
     )
-    event_metadata: Optional[dict[str, object]] = Field(
+    event_metadata: dict[str, object] | None = Field(
         description="Arbitrary event-specific context."
     )
     created_at: datetime = Field(

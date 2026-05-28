@@ -90,7 +90,12 @@ async def request_password_reset(
     auth_service: AuthSvc,
 ) -> MessageResponse:
     """Trigger a Supabase password reset email. Always returns success to prevent email enumeration."""
-    await auth_service.send_password_reset(body.email)
+    try:
+        await auth_service.send_password_reset(body.email)
+    except Exception:
+        # Swallow all errors — a different response code for unknown emails would
+        # let attackers enumerate which addresses are registered (email enumeration).
+        pass
     return MessageResponse(
         message="If that email exists, we've sent a reset link.",
         detail="Check your inbox.",

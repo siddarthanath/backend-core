@@ -14,8 +14,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.configs.settings import app_settings
 from src.core.dependencies.database import get_db
 from src.schemas.health import HealthResponse, ReadyResponse
+from src.utils.logging import get_logger
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
+
+log = get_logger(__name__)
 
 router = APIRouter(tags=["Health"])
 
@@ -40,7 +43,8 @@ async def ready(db: AsyncSession = Depends(get_db)) -> ReadyResponse:
     try:
         await db.execute(text("SELECT 1"))
         db_status = "ok"
-    except Exception:
+    except Exception as e:
+        log.warning("ready.db_probe_failed", error=str(e))
         db_status = "error"
 
     return ReadyResponse(status="ready", checks={"database": db_status})

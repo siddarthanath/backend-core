@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime, timezone
 
 # Third-Party Library
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 
@@ -97,8 +98,8 @@ class SubscriptionRepository(BaseRepository[Subscription]):
 class StripeWebhookEventRepository:
     """Repository for StripeWebhookEvent — idempotency deduplication for Stripe webhooks."""
 
-    def __init__(self, session: object) -> None:
-        self.session = session  # type: ignore[assignment]
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
 
     async def exists(self, event_id: str) -> bool:
         """Return True if this Stripe event has already been processed.

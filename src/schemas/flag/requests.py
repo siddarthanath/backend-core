@@ -3,7 +3,6 @@
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
 # Standard Library
-from typing import Optional
 
 # Third-Party Library
 from pydantic import BaseModel, Field
@@ -21,7 +20,7 @@ class UpsertFlagRequest(BaseModel):
         description="Snake_case identifier e.g. 'new_billing_ui'; must be unique per org.",
     )
     enabled: bool = Field(description="Whether the flag is active.")
-    description: Optional[str] = Field(
+    description: str | None = Field(
         default=None,
         max_length=300,
         description="Optional human-readable note about the flag's purpose.",

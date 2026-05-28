@@ -56,10 +56,10 @@ async def get_current_user(
             issuer=f"{auth_settings.SUPABASE_URL}/auth/v1",
             leeway=10,
         )
-    except jwt.ExpiredSignatureError:
-        raise AuthException(message="Token expired")
-    except jwt.InvalidTokenError:
-        raise AuthException(message="Invalid token")
+    except jwt.ExpiredSignatureError as e:
+        raise AuthException(message="Token expired") from e
+    except jwt.InvalidTokenError as e:
+        raise AuthException(message="Invalid token") from e
 
     meta = payload.get("user_metadata", {})
     claims = UserClaims(

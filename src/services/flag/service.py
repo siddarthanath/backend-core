@@ -4,7 +4,6 @@
 
 # Standard Library
 import uuid
-from typing import Optional
 
 # Private Library
 from src.constants import Role
@@ -84,7 +83,7 @@ class FeatureFlagService:
         user_id: uuid.UUID,
         key: str,
         enabled: bool,
-        description: Optional[str] = None,
+        description: str | None = None,
     ) -> FeatureFlagResponse:
         """Create or update a feature flag.
 

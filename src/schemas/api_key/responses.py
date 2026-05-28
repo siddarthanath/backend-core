@@ -5,7 +5,6 @@
 # Standard Library
 import uuid
 from datetime import datetime
-from typing import Optional
 
 # Third-Party Library
 from pydantic import BaseModel, Field
@@ -24,10 +23,10 @@ class ApiKeyResponse(BaseModel):
         description="First 11 chars of the raw key shown for identification e.g. 'sk_abc12345x'."
     )
     created_at: datetime = Field(description="UTC timestamp when the key was created.")
-    expires_at: Optional[datetime] = Field(
+    expires_at: datetime | None = Field(
         description="UTC expiry time; null = never expires."
     )
-    last_used_at: Optional[datetime] = Field(
+    last_used_at: datetime | None = Field(
         description="UTC timestamp of most recent use; null if never used."
     )
 

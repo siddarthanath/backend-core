@@ -4,7 +4,6 @@
 
 # Standard Library
 import uuid
-from typing import Optional
 
 # Third-Party Library
 import sqlalchemy as sa
@@ -29,14 +28,14 @@ class AuditLog(UUIDMixin, TimestampMixin, SQLModel, table=True):
         nullable=False,
         index=True,
     )
-    actor_id: Optional[uuid.UUID] = Field(
+    actor_id: uuid.UUID | None = Field(
         default=None,
         foreign_key="user_profiles.id",
         nullable=True,
     )
     action: str = Field(nullable=False, max_length=100)
     resource_type: str = Field(nullable=False, max_length=100)
-    resource_id: Optional[str] = Field(default=None, max_length=200)
+    resource_id: str | None = Field(default=None, max_length=200)
     event_metadata: Optional[dict[str, object]] = Field(
         default=None,
         sa_type=sa.JSON,

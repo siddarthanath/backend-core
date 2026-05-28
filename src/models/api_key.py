@@ -5,7 +5,6 @@
 # Standard Library
 import uuid
 from datetime import datetime
-from typing import Optional
 
 # Third-Party Library
 import sqlalchemy as sa
@@ -32,7 +31,7 @@ class ApiKey(UUIDMixin, TimestampMixin, SoftDeleteMixin, SQLModel, table=True):
         nullable=False,
         index=True,
     )
-    created_by: Optional[uuid.UUID] = Field(
+    created_by: uuid.UUID | None = Field(
         default=None,
         foreign_key="user_profiles.id",
         nullable=True,
@@ -40,11 +39,11 @@ class ApiKey(UUIDMixin, TimestampMixin, SoftDeleteMixin, SQLModel, table=True):
     name: str = Field(nullable=False, max_length=100)
     key_prefix: str = Field(nullable=False, max_length=16)
     key_hash: str = Field(nullable=False, unique=True)
-    last_used_at: Optional[datetime] = Field(
+    last_used_at: datetime | None = Field(
         default=None,
         sa_type=sa.DateTime(timezone=True),
     )
-    expires_at: Optional[datetime] = Field(
+    expires_at: datetime | None = Field(
         default=None,
         sa_type=sa.DateTime(timezone=True),
     )

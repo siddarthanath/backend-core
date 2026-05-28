@@ -36,6 +36,13 @@ from src.utils.logging import get_logger
 
 log = get_logger(__name__)
 
+_PLAN_ORDER: dict[Plan, int] = {
+    Plan.FREE: 0,
+    Plan.PRO: 1,
+    Plan.MAX: 2,
+    Plan.ENTERPRISE: 3,
+}
+
 
 def _build_price_map() -> dict[tuple[Plan, BillingPeriod], str]:
     return {
@@ -80,7 +87,7 @@ class StripeBillingService(BaseBillingService):
             tuple[str, str]: (checkout_url, stripe_customer_id).
 
         """
-        params: dict = {
+        params: dict[str, object] = {
             "mode": "subscription",
             "line_items": [{"price": price_id, "quantity": 1}],
             "success_url": success_url,
@@ -268,7 +275,7 @@ class BillingOrchestrator:
         price_map = _build_price_map()
         price_id = price_map.get((plan, period))
         if not price_id:
-            raise ValueError(
+            raise AppValidationError(
                 f"No Stripe price ID configured for plan={plan.value} period={period.value}"
             )
 
@@ -326,12 +333,6 @@ class BillingOrchestrator:
                 "No active subscription to upgrade — use checkout to start one"
             )
 
-        _PLAN_ORDER: dict[Plan, int] = {
-            Plan.FREE: 0,
-            Plan.PRO: 1,
-            Plan.MAX: 2,
-            Plan.ENTERPRISE: 3,
-        }
         if _PLAN_ORDER.get(plan, 0) <= _PLAN_ORDER.get(sub.plan, 0):
             # Same tier or downgrade — must go through the Stripe portal
             raise ConflictError("Subscription", "plan", plan.value)

@@ -4,6 +4,7 @@
 
 # Standard Library
 import asyncio
+from collections.abc import Awaitable, Callable
 
 # Third-Party Library
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -28,7 +29,7 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
 
     """
 
-    async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[override]
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:  # type: ignore[override]
         try:
             return await asyncio.wait_for(
                 call_next(request),
