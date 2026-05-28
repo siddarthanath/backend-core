@@ -118,16 +118,29 @@ class StripeWebhookEventRepository:
     async def record(self, event_id: str, event_type: str) -> None:
         """Insert a processed event record.
 
+        Uses a savepoint so that a concurrent duplicate (two Stripe retries arriving
+        simultaneously both passing the exists() check) raises IntegrityError only at
+        the savepoint level. The outer transaction — which includes the subscription
+        update — is left intact and commits normally. Without the savepoint, the
+        IntegrityError would poison the entire transaction, roll back the subscription
+        update, and return 500, causing Stripe to retry indefinitely.
+
         Args:
             event_id (str): Stripe event ID.
             event_type (str): Stripe event type (e.g. checkout.session.completed).
 
         """
-        self.session.add(
-            StripeWebhookEvent(
-                event_id=event_id,
-                event_type=event_type,
-                processed_at=datetime.now(timezone.utc),
-            )
-        )
-        await self.session.flush()
+        try:
+            async with self.session.begin_nested():
+                self.session.add(
+                    StripeWebhookEvent(
+                        event_id=event_id,
+                        event_type=event_type,
+                        processed_at=datetime.now(timezone.utc),
+                    )
+                )
+                await self.session.flush()
+        except IntegrityError:
+            # A concurrent request already recorded this event. The subscription update
+            # in the outer transaction is unaffected and will still commit.
+            pass
