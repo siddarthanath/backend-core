@@ -26,9 +26,11 @@ from src.schemas.user.requests import (
     UpdateProfileRequest,
 )
 from src.schemas.user.responses import UserMeResponse, build_user_me_response
+from src.utils.logging import get_logger
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
+log = get_logger(__name__)
 router = APIRouter(prefix="/user", tags=["User"])
 
 
@@ -92,10 +94,10 @@ async def request_password_reset(
     """Trigger a Supabase password reset email. Always returns success to prevent email enumeration."""
     try:
         await auth_service.send_password_reset(body.email)
-    except Exception:
+    except Exception as e:
         # Swallow all errors — a different response code for unknown emails would
         # let attackers enumerate which addresses are registered (email enumeration).
-        pass
+        log.warning("password_reset.failed", error=str(e))
     return MessageResponse(
         message="If that email exists, we've sent a reset link.",
         detail="Check your inbox.",

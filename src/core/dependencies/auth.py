@@ -61,7 +61,7 @@ async def get_current_user(
     except jwt.InvalidTokenError as e:
         raise AuthException(message="Invalid token") from e
 
-    meta = payload.get("user_metadata", {})
+    meta = payload.get("user_metadata") or {}
     claims = UserClaims(
         sub=payload["sub"],
         email=payload.get("email", ""),
