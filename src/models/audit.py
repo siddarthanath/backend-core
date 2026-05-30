@@ -36,7 +36,7 @@ class AuditLog(UUIDMixin, TimestampMixin, SQLModel, table=True):
     action: str = Field(nullable=False, max_length=100)
     resource_type: str = Field(nullable=False, max_length=100)
     resource_id: str | None = Field(default=None, max_length=200)
-    event_metadata: Optional[dict[str, object]] = Field(
+    event_metadata: dict[str, object] | None = Field(
         default=None,
         sa_type=sa.JSON,
     )
