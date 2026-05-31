@@ -286,7 +286,9 @@ class TestCreateCheckout:
         subscription_repo.upsert_free.return_value = make_subscription(plan=Plan.FREE)
 
         with patch("src.services.billing.service._build_price_map", return_value={}):
-            with pytest.raises(AppValidationError, match="No Stripe price ID configured"):
+            with pytest.raises(
+                AppValidationError, match="No Stripe price ID configured"
+            ):
                 await orchestrator.create_checkout(
                     uuid.uuid4(),
                     uuid.uuid4(),

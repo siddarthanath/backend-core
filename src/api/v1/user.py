@@ -34,7 +34,6 @@ log = get_logger(__name__)
 router = APIRouter(prefix="/user", tags=["User"])
 
 
-
 @router.get("/me", response_model=UserMeResponse)
 @limiter.limit("120/minute")
 async def get_me(

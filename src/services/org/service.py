@@ -377,7 +377,10 @@ class OrgService:
                 owner_counts[membership.org_id] = count
                 if (
                     count == 1
-                    and await self.membership_repo.count_active_members(membership.org_id) > 1
+                    and await self.membership_repo.count_active_members(
+                        membership.org_id
+                    )
+                    > 1
                 ):
                     raise AppValidationError(
                         "You are the sole owner of an organisation with other members. "
@@ -385,7 +388,10 @@ class OrgService:
                     )
 
         for membership in memberships:
-            if membership.role == Role.OWNER and owner_counts.get(membership.org_id) == 1:
+            if (
+                membership.role == Role.OWNER
+                and owner_counts.get(membership.org_id) == 1
+            ):
                 org = await self.org_repo.get_by_id(membership.org_id)
                 if org:
                     await self.org_repo.hard_delete(org)

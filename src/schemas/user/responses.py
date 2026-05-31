@@ -43,7 +43,9 @@ class UserMeResponse(UserProfileResponse):
     # Putting plan here would require a billing lookup on every auth check.
 
 
-def build_user_me_response(user: "UserProfile", orgs: "list[Organisation]") -> "UserMeResponse":
+def build_user_me_response(
+    user: "UserProfile", orgs: "list[Organisation]"
+) -> "UserMeResponse":
     personal_org = next((o for o in orgs if o.is_personal), None)
     return UserMeResponse(
         id=user.id,

@@ -26,7 +26,9 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """Generates a UUID per request, binds it to both the async context and structlog
     contextvars, then logs method/path/status/duration on completion."""
 
-    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:  # type: ignore[override]
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:  # type: ignore[override]
         request_id = str(uuid.uuid4())
 
         # Clear any context left by a previous request on this worker, then bind fresh values.
