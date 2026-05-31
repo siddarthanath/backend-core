@@ -5,7 +5,6 @@
 # Standard Library
 import uuid
 from datetime import datetime
-from typing import Optional
 
 # Third-Party Library
 from pydantic import BaseModel, ConfigDict
@@ -25,10 +24,10 @@ class SubscriptionResponse(BaseModel):
     org_id: uuid.UUID
     plan: Plan
     status: SubscriptionStatus
-    stripe_subscription_id: Optional[str]
-    current_period_end: Optional[datetime]
+    stripe_subscription_id: str | None
+    current_period_end: datetime | None
     cancel_at_period_end: bool
-    cancellation_reason: Optional[str]
+    cancellation_reason: str | None
     created_at: datetime
 
 

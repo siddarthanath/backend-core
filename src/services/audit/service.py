@@ -6,6 +6,7 @@
 import uuid
 
 # Private Library
+from src.constants import Role
 from src.core.exceptions.types import ForbiddenError, NotFoundError
 from src.models.audit import AuditLog
 from src.repositories.audit import AuditRepository
@@ -92,8 +93,6 @@ class AuditService:
         org = await self.org_repo.get_by_id(org_id)
         if not org:
             raise NotFoundError("Organisation", org_id)
-        from src.constants import Role
-
         if not await self.membership_repo.user_has_role(user_id, org_id, Role.ADMIN):
             raise ForbiddenError("Only admins can view the audit log")
 

@@ -5,7 +5,6 @@
 # Standard Library
 import uuid
 from datetime import datetime
-from typing import Optional
 
 # Third-Party Library
 from pydantic import BaseModel, ConfigDict
@@ -38,6 +37,6 @@ class MemberResponse(BaseModel):
     org_id: uuid.UUID
     role: Role
     status: MembershipStatus
-    invited_by: Optional[uuid.UUID]
-    email: Optional[str] = None
+    invited_by: uuid.UUID | None
+    email: str | None = None
     created_at: datetime

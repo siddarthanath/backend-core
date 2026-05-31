@@ -3,8 +3,8 @@
 # ───────────────────────────────────────────────────── Imports ────────────────────────────────────────────────────── #
 
 # Standard Library
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 # Third-Party Library
 from sqlalchemy.ext.asyncio import (

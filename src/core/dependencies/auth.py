@@ -56,16 +56,18 @@ async def get_current_user(
             issuer=f"{auth_settings.SUPABASE_URL}/auth/v1",
             leeway=10,
         )
-    except jwt.ExpiredSignatureError:
-        raise AuthException(message="Token expired")
-    except jwt.InvalidTokenError:
-        raise AuthException(message="Invalid token")
+    except jwt.ExpiredSignatureError as e:
+        raise AuthException(message="Token expired") from e
+    except jwt.InvalidTokenError as e:
+        raise AuthException(message="Invalid token") from e
 
+    meta = payload.get("user_metadata") or {}
     claims = UserClaims(
         sub=payload["sub"],
         email=payload.get("email", ""),
         role=payload.get("role", "authenticated"),
-        full_name=payload.get("user_metadata", {}).get("full_name"),
+        first_name=meta.get("first_name"),
+        last_name=meta.get("last_name"),
     )
     set_request_user_id(claims.sub)
     # Bind to user to flow into all downstream logs

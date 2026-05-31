@@ -5,7 +5,6 @@
 # Standard Library
 import uuid
 from datetime import datetime
-from typing import Optional
 
 # Third-Party Library
 import sqlalchemy as sa
@@ -46,17 +45,17 @@ class Subscription(UUIDMixin, TimestampMixin, SQLModel, table=True):
             SubscriptionStatus, name="subscriptionstatus", create_type=True
         ),
     )
-    stripe_subscription_id: Optional[str] = Field(
+    stripe_subscription_id: str | None = Field(
         default=None,
         unique=True,
         index=True,
         description="Stripe subscription ID — null for FREE plan",
     )
-    stripe_price_id: Optional[str] = Field(
+    stripe_price_id: str | None = Field(
         default=None,
         description="Stripe price ID in use — null for FREE plan",
     )
-    current_period_end: Optional[datetime] = Field(
+    current_period_end: datetime | None = Field(
         default=None,
         sa_type=sa.DateTime(timezone=True),
         description="UTC timestamp of the current billing period end",
@@ -65,7 +64,7 @@ class Subscription(UUIDMixin, TimestampMixin, SQLModel, table=True):
         default=False,
         description="True when the user has requested cancellation at period end",
     )
-    cancellation_reason: Optional[str] = Field(
+    cancellation_reason: str | None = Field(
         default=None,
         description="Reason captured from the in-app cancellation modal; NULL for portal cancellations",
     )

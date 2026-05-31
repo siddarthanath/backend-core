@@ -25,10 +25,12 @@ from src.schemas.user.requests import (
     UpdatePasswordRequest,
     UpdateProfileRequest,
 )
-from src.schemas.user.responses import UserMeResponse
+from src.schemas.user.responses import UserMeResponse, build_user_me_response
+from src.utils.logging import get_logger
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
+log = get_logger(__name__)
 router = APIRouter(prefix="/user", tags=["User"])
 
 
@@ -50,21 +52,14 @@ async def get_me(
     """
     user_id = uuid.UUID(claims.sub)
     user = await service.get_or_create(
-        user_id, email=claims.email, full_name=claims.full_name
+        user_id,
+        email=claims.email,
+        first_name=claims.first_name,
+        last_name=claims.last_name,
     )
     await org_service.get_or_create_personal(user_id, email=claims.email)
     orgs = await org_service.list_my_orgs(user_id)
-    personal_org = next((o for o in orgs if o.is_personal), None)
-    return UserMeResponse(
-        id=user.id,
-        email=user.email,
-        first_name=user.first_name,
-        last_name=user.last_name,
-        created_at=user.created_at,
-        org_count=len(orgs),
-        org_id=personal_org.id if personal_org else None,
-        org_name=personal_org.name if personal_org else None,
-    )
+    return build_user_me_response(user, orgs)
 
 
 @router.patch("/me", response_model=UserMeResponse)
@@ -84,17 +79,7 @@ async def update_profile(
         last_name=body.last_name,
     )
     orgs = await org_service.list_my_orgs(user_id)
-    personal_org = next((o for o in orgs if o.is_personal), None)
-    return UserMeResponse(
-        id=user.id,
-        email=user.email,
-        first_name=user.first_name,
-        last_name=user.last_name,
-        created_at=user.created_at,
-        org_count=len(orgs),
-        org_id=personal_org.id if personal_org else None,
-        org_name=personal_org.name if personal_org else None,
-    )
+    return build_user_me_response(user, orgs)
 
 
 @router.post("/reset-password", response_model=MessageResponse)
@@ -106,7 +91,12 @@ async def request_password_reset(
     auth_service: AuthSvc,
 ) -> MessageResponse:
     """Trigger a Supabase password reset email. Always returns success to prevent email enumeration."""
-    await auth_service.send_password_reset(body.email)
+    try:
+        await auth_service.send_password_reset(body.email)
+    except Exception as e:
+        # Swallow all errors — a different response code for unknown emails would
+        # let attackers enumerate which addresses are registered (email enumeration).
+        log.warning("password_reset.failed", error=str(e))
     return MessageResponse(
         message="If that email exists, we've sent a reset link.",
         detail="Check your inbox.",

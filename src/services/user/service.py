@@ -24,25 +24,21 @@ class UserService:
         self,
         user_id: uuid.UUID,
         email: str,
-        full_name: str | None = None,
+        first_name: str | None = None,
+        last_name: str | None = None,
     ) -> UserProfile:
         """Return existing profile or create one from Supabase auth data.
 
         Args:
             user_id (uuid.UUID): Supabase auth UUID (sub claim).
             email (str): Email from the verified JWT.
-            full_name (str | None): Display name from JWT user_metadata — split into first/last.
+            first_name (str | None): From JWT user_metadata, first login only.
+            last_name (str | None): From JWT user_metadata, first login only.
 
         Returns:
             UserProfile: The existing or newly created profile.
 
         """
-        first_name: str | None = None
-        last_name: str | None = None
-        if full_name:
-            parts = full_name.strip().split(" ", 1)
-            first_name = parts[0] or None
-            last_name = parts[1] if len(parts) > 1 else None
         return await self.repo.upsert_from_supabase(
             user_id=user_id,
             email=email,

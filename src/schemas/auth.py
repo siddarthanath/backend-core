@@ -19,4 +19,5 @@ class UserClaims(BaseModel):
     sub: str
     email: str
     role: str
-    full_name: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None

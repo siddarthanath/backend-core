@@ -6,7 +6,7 @@
 import uuid
 
 # Third-Party Library
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 # Private Library
 from src.models.audit import AuditLog
@@ -57,8 +57,6 @@ class AuditRepository(BaseRepository[AuditLog]):
             int: Total event count.
 
         """
-        from sqlalchemy import func
-
         stmt = (
             select(func.count()).select_from(AuditLog).where(AuditLog.org_id == org_id)
         )

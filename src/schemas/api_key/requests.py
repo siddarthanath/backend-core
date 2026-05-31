@@ -4,7 +4,6 @@
 
 # Standard Library
 from datetime import datetime
-from typing import Optional
 
 # Third-Party Library
 from pydantic import BaseModel, Field
@@ -20,7 +19,7 @@ class CreateApiKeyRequest(BaseModel):
         max_length=100,
         description="Human-readable label for the key e.g. 'CI Pipeline'.",
     )
-    expires_at: Optional[datetime] = Field(
+    expires_at: datetime | None = Field(
         default=None,
         description="Optional UTC datetime after which the key is invalid; null = never expires.",
     )

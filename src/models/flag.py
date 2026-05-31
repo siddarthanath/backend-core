@@ -4,7 +4,6 @@
 
 # Standard Library
 import uuid
-from typing import Optional
 
 # Third-Party Library
 import sqlalchemy as sa
@@ -35,4 +34,4 @@ class FeatureFlag(UUIDMixin, TimestampMixin, SQLModel, table=True):
     )
     key: str = Field(nullable=False, max_length=100)
     enabled: bool = Field(default=False, nullable=False)
-    description: Optional[str] = Field(default=None, max_length=300)
+    description: str | None = Field(default=None, max_length=300)

@@ -5,6 +5,7 @@
 # Standard Library
 import time
 import uuid
+from collections.abc import Awaitable, Callable
 
 # Third-Party Library
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -25,7 +26,9 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """Generates a UUID per request, binds it to both the async context and structlog
     contextvars, then logs method/path/status/duration on completion."""
 
-    async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[override]
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:  # type: ignore[override]
         request_id = str(uuid.uuid4())
 
         # Clear any context left by a previous request on this worker, then bind fresh values.
@@ -61,7 +64,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             method=request.method,
             path=request.url.path,
             status=response.status_code,
-            duration_ms=round(duration_ms, 1),
+            duration_ms=duration_ms,
         )
         response.headers["X-Request-ID"] = request_id
         return response
