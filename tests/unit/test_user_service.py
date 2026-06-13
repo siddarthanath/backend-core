@@ -46,7 +46,9 @@ def make_profile(**kwargs: object) -> MagicMock:
 class TestUpdatePasswordRequest:
     @pytest.mark.unit
     def test_accepts_strong_password(self) -> None:
-        req = UpdatePasswordRequest(current_password="OldPass1!", new_password="Secure1!")
+        req = UpdatePasswordRequest(
+            current_password="OldPass1!", new_password="Secure1!"
+        )
         assert req.new_password == "Secure1!"
         assert req.current_password == "OldPass1!"
 
@@ -70,12 +72,16 @@ class TestUpdatePasswordRequest:
     @pytest.mark.unit
     def test_rejects_no_digit(self) -> None:
         with pytest.raises(ValidationError, match="number"):
-            UpdatePasswordRequest(current_password="OldPass1!", new_password="NoDigits!")
+            UpdatePasswordRequest(
+                current_password="OldPass1!", new_password="NoDigits!"
+            )
 
     @pytest.mark.unit
     def test_rejects_no_special_char(self) -> None:
         with pytest.raises(ValidationError, match="special"):
-            UpdatePasswordRequest(current_password="OldPass1!", new_password="NoSpecial1")
+            UpdatePasswordRequest(
+                current_password="OldPass1!", new_password="NoSpecial1"
+            )
 
 
 class TestGetMe:
