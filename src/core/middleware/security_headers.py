@@ -16,13 +16,14 @@ from starlette.responses import Response
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Attach baseline security headers to all responses.
 
-    This API returns only JSON, so the policy is deliberately strict:
+    This API returns only JSON, so the CSP is deliberately strict:
     - default-src 'none': the response references no resources, so nothing should load.
     - nosniff: never let a browser MIME-sniff a JSON body into something executable.
     - DENY framing + no-referrer: this API is never embedded or navigated to directly.
 
-    The browser-facing app sets its own (looser) CSP for HTML — see the frontend's
-    next.config.ts.
+    The strict CSP is skipped for HTML responses so it does not break the built-in
+    interactive docs (/docs, /redoc), whose Swagger/ReDoc assets would otherwise be
+    blocked. The browser-facing app sets its own (looser) CSP — see next.config.ts.
     """
 
     async def dispatch(
@@ -32,5 +33,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers["Content-Security-Policy"] = "default-src 'none'"
+        if "text/html" not in response.headers.get("content-type", ""):
+            response.headers["Content-Security-Policy"] = "default-src 'none'"
         return response

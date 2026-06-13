@@ -19,13 +19,16 @@ def add_cors(app: FastAPI) -> None:
         app (FastAPI): The application instance.
 
     """
-    # Methods/headers are listed explicitly rather than "*" — with credentialed
-    # requests there's no reason to advertise more than the API actually uses.
-    # Add to these lists if you introduce new verbs or custom request headers.
+    # Origin is the real CORS security boundary and stays explicit (CORS_ORIGINS).
+    # Methods are listed explicitly too — cheap, and add a verb here if you need one.
+    # Headers stay "*" on purpose: restricting them has ~no security value (origin is
+    # the gate) but breaks tracing/APM tools that inject custom headers (sentry-trace,
+    # baggage, traceparent). Starlette echoes the requested headers, so "*" remains
+    # compatible with allow_credentials=True.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=app_settings.CORS_ORIGINS,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "stripe-signature"],
+        allow_headers=["*"],
     )
