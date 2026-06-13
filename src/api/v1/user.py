@@ -131,7 +131,12 @@ async def update_password(
     the UI (which an attacker calling the API directly would bypass).
     """
     if not await auth_service.verify_password(claims.email, body.current_password):
-        raise AppValidationError("Current password is incorrect")
+        # detail tags WHICH field failed so the frontend can attribute the error
+        # to the current-password field — a new-password strength failure would
+        # also surface as VALIDATION_ERROR but without this detail.
+        raise AppValidationError(
+            "Current password is incorrect", detail="current_password"
+        )
     await auth_service.update_password(uuid.UUID(claims.sub), body.new_password)
     return MessageResponse(message="Password updated successfully.")
 
