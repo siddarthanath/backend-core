@@ -14,6 +14,7 @@ from src.core.middleware.body_limit import BodySizeLimitMiddleware
 from src.core.middleware.cors import add_cors
 from src.core.middleware.rate_limit import limiter
 from src.core.middleware.request import RequestLoggingMiddleware
+from src.core.middleware.security_headers import SecurityHeadersMiddleware
 from src.core.middleware.timeout import TimeoutMiddleware
 from src.core.middleware.api import APILoggingMiddleware
 
@@ -28,6 +29,7 @@ def add_middleware(app: FastAPI) -> None:
     Effective request order:
 
     CORS
+    → SecurityHeaders
     → SlowAPI
     → BodySizeLimit
     → RequestLogging
@@ -50,5 +52,8 @@ def add_middleware(app: FastAPI) -> None:
         BodySizeLimitMiddleware, max_bytes=app_settings.MAX_BODY_SIZE_MB * 1024 * 1024
     )
     app.add_middleware(SlowAPIMiddleware)
+    # Added just inside CORS (outermost) so the headers land on EVERY response —
+    # including error responses produced by inner middleware (429, 504).
+    app.add_middleware(SecurityHeadersMiddleware)
 
     add_cors(app)

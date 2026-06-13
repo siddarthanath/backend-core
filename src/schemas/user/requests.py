@@ -18,14 +18,25 @@ class UpdateProfileRequest(BaseModel):
 
 
 class UpdateEmailRequest(BaseModel):
-    """Request to update the authenticated user's email via Supabase admin."""
+    """Request to update the authenticated user's email via Supabase admin.
 
+    The email-change endpoint is disabled in this template (see api/v1/user.py).
+    current_password is included so the re-enabled endpoint can re-authenticate
+    before changing the email — same pattern as UpdatePasswordRequest.
+    """
+
+    current_password: str
     new_email: EmailStr
 
 
 class UpdatePasswordRequest(BaseModel):
-    """Request to update the authenticated user's password via Supabase admin."""
+    """Request to update the authenticated user's password via Supabase admin.
 
+    current_password is re-verified server-side before the change — a valid JWT
+    alone must not be enough to rotate the password (see H1 in FINDINGS.md).
+    """
+
+    current_password: str
     new_password: str
 
     @field_validator("new_password")
@@ -43,12 +54,6 @@ class UpdatePasswordRequest(BaseModel):
         if not any(not c.isalnum() for c in v):
             raise ValueError("Password must contain at least one special character")
         return v
-
-
-class RequestPasswordResetRequest(BaseModel):
-    """Public endpoint — triggers Supabase to email a password reset link."""
-
-    email: EmailStr
 
 
 class DeleteAccountRequest(BaseModel):

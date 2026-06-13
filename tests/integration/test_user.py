@@ -12,9 +12,39 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Private Library
+from src.core.exceptions.types import ConflictError
 from src.models.user import UserProfile
+from src.repositories.user import UserRepository
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_upsert_raises_conflict_on_duplicate_active_email(
+    db_session: AsyncSession,
+) -> None:
+    """H3: a second active profile with the same email under a different UUID must
+    raise ConflictError (clean 409), not a raw IntegrityError 500. The savepoint
+    must also leave the session usable afterwards.
+    """
+    repo = UserRepository(db_session)
+    email = f"dup-{uuid.uuid4()}@example.com"
+    id_a, id_b = uuid.uuid4(), uuid.uuid4()
+
+    await repo.upsert_from_supabase(user_id=id_a, email=email)
+
+    with pytest.raises(ConflictError):
+        await repo.upsert_from_supabase(user_id=id_b, email=email)
+
+    # Savepoint rolled back only the failed insert — the session is still usable.
+    again = await repo.upsert_from_supabase(user_id=id_a, email=email)
+    assert again.id == id_a
+
+    await db_session.execute(
+        delete(UserProfile).where(UserProfile.id.in_([id_a, id_b]))
+    )
+    await db_session.commit()
 
 
 @pytest.mark.integration

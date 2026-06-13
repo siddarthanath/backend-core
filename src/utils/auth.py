@@ -29,3 +29,20 @@ def get_supabase_admin_client() -> Client:
         auth_settings.SUPABASE_URL,
         auth_settings.SUPABASE_SERVICE_ROLE_KEY,
     )
+
+
+def get_supabase_anon_client() -> Client:
+    """Return a fresh Supabase client using the anon key.
+
+    Deliberately NOT cached: sign_in_with_password mutates the client's session
+    state, so sharing one instance across concurrent requests would leak sessions
+    between users. Each call gets its own throwaway client.
+
+    Returns:
+        Client: Supabase client with anon (public) privileges.
+
+    """
+    return create_client(
+        auth_settings.SUPABASE_URL,
+        auth_settings.SUPABASE_ANON_KEY,
+    )

@@ -104,6 +104,11 @@ class UserService:
         background job to hard-delete the row, cancel Stripe, purge storage, and remove
         from email lists asynchronously with retries after a grace period.
 
+        DATA RETENTION (GDPR etc.): a soft-deleted row keeps the user's email and name
+        indefinitely. For real B2C use you must hard-delete that PII after a grace
+        period. scripts/purge_deleted_users.py does exactly this (run it on a schedule
+        — cron, Supabase scheduled function, etc.). See docs/DEPLOYMENT.md.
+
         Args:
             user_id (uuid.UUID): The authenticated user's UUID.
 
