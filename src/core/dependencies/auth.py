@@ -62,12 +62,18 @@ async def get_current_user(
         raise AuthException(message="Invalid token") from e
 
     meta = payload.get("user_metadata") or {}
+    # OAuth providers (Google, Microsoft) set full_name/name rather than first_name/last_name.
+    # Fall back to splitting the full name so OAuth signups populate the profile on first login.
+    full_name = (meta.get("full_name") or meta.get("name") or "").strip()
+    parts = full_name.split(" ", 1) if full_name else []
+    first_name = meta.get("first_name") or (parts[0] if parts else None)
+    last_name = meta.get("last_name") or (parts[1] if len(parts) > 1 else None)
     claims = UserClaims(
         sub=payload["sub"],
         email=payload.get("email", ""),
         role=payload.get("role", "authenticated"),
-        first_name=meta.get("first_name"),
-        last_name=meta.get("last_name"),
+        first_name=first_name,
+        last_name=last_name,
     )
     set_request_user_id(claims.sub)
     # Bind to user to flow into all downstream logs

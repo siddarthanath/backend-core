@@ -8,11 +8,13 @@ from typing import Annotated, TypeAlias
 
 # Third-Party Library
 from fastapi import Depends
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Private Library
 from src.core.dependencies.auth import get_current_user
 from src.core.dependencies.database import get_db
+from src.core.exceptions.types import AuthException
 from src.repositories.billing import (
     StripeWebhookEventRepository,
     SubscriptionRepository,
@@ -179,6 +181,46 @@ UserSvc: TypeAlias = Annotated[UserService, Depends(get_user_service)]
 OrgSvc: TypeAlias = Annotated[OrgService, Depends(get_org_service)]
 BillingSvc: TypeAlias = Annotated[BillingOrchestrator, Depends(get_billing_service)]
 
+
+# API-key authentication (org-scoped) -----------------------------------------
+# JWT auth (get_current_user) identifies a *user*. API keys identify an *org*
+# for machine-to-machine access (scripts, integrations) where no user is logged
+# in. This dependency is shipped ready to use but attached to no endpoint by
+# default — the template has no product endpoints. To protect a product endpoint
+# with an API key instead of a user session, declare `org_id: CurrentApiKeyOrg`:
+#
+#     @router.get("/widgets")
+#     async def list_widgets(org_id: CurrentApiKeyOrg) -> list[WidgetResponse]:
+#         ...
+#
+_api_key_bearer = HTTPBearer(scheme_name="ApiKey", auto_error=True)
+
+
+async def get_api_key_org(
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(_api_key_bearer)],
+    service: ApiKeySvc,
+) -> uuid.UUID:
+    """Authenticate a request by its API key and return the owning org's UUID.
+
+    Args:
+        credentials (HTTPAuthorizationCredentials): Bearer credentials — the raw sk_... key.
+        service (ApiKeyService): Resolved for the request session.
+
+    Returns:
+        uuid.UUID: The org the key belongs to.
+
+    Raises:
+        AuthException: If the key is missing, unknown, revoked, or expired.
+
+    """
+    key = await service.verify(credentials.credentials)
+    if key is None:
+        raise AuthException(message="Invalid or expired API key")
+    return key.org_id
+
+
+CurrentApiKeyOrg: TypeAlias = Annotated[uuid.UUID, Depends(get_api_key_org)]
+
 __all__ = [
     "get_db",
     "get_current_user",
@@ -190,8 +232,10 @@ __all__ = [
     "get_audit_service",
     "get_flag_service",
     "get_api_key_service",
+    "get_api_key_org",
     "CurrentUserID",
     "CurrentUserClaims",
+    "CurrentApiKeyOrg",
     "DBSession",
     "AuthSvc",
     "UserSvc",

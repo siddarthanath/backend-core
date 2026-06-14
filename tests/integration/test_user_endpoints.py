@@ -4,7 +4,6 @@
 
 # Standard Library
 import uuid
-from unittest.mock import patch
 
 # Third-Party Library
 import pytest
@@ -92,21 +91,3 @@ class TestUpdateProfile:
             assert data["last_name"] == "Smith"
         finally:
             app.dependency_overrides.clear()
-
-
-@pytest.mark.integration
-class TestPasswordReset:
-    async def test_always_returns_200_regardless_of_email(
-        self, client: AsyncClient
-    ) -> None:
-        with patch(
-            "src.services.auth.service.get_supabase_admin_client"
-        ) as mock_client:
-            mock_client.return_value.auth.admin.generate_link.return_value = {}
-            response = await client.post(
-                "/api/v1/user/reset-password",
-                json={"email": "nobody@example.com"},
-            )
-        assert response.status_code == 200
-        data = response.json()
-        assert "reset link" in data["message"]

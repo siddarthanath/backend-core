@@ -117,13 +117,19 @@ async def upgrade_subscription(
 
 
 @router.post("/billing/webhook", response_model=MessageResponse)
-@limiter.limit("300/minute")
+@limiter.exempt
 async def stripe_webhook(
     request: Request,
     service: BillingSvc,
     stripe_signature: str = Header(alias="stripe-signature"),
 ) -> MessageResponse:
-    """Receive and process Stripe webhook events. No auth — verified by signature."""
+    """Receive and process Stripe webhook events. No auth — verified by signature.
+
+    Exempt from rate limiting: all of Stripe's retries arrive from a small set of
+    shared egress IPs, so an IP-keyed limit would throttle legitimate event bursts
+    (and a retried-to-death event delays subscription state). The signature check
+    is the real gate, and the idempotency table dedupes replays.
+    """
     payload = await request.body()
     await service.handle_webhook(payload, stripe_signature)
     return MessageResponse(message="ok")

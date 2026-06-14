@@ -46,28 +46,42 @@ def make_profile(**kwargs: object) -> MagicMock:
 class TestUpdatePasswordRequest:
     @pytest.mark.unit
     def test_accepts_strong_password(self) -> None:
-        req = UpdatePasswordRequest(new_password="Secure1!")
+        req = UpdatePasswordRequest(
+            current_password="OldPass1!", new_password="Secure1!"
+        )
         assert req.new_password == "Secure1!"
+        assert req.current_password == "OldPass1!"
+
+    @pytest.mark.unit
+    def test_rejects_missing_current_password(self) -> None:
+        with pytest.raises(ValidationError, match="current_password"):
+            UpdatePasswordRequest(new_password="Secure1!")  # type: ignore[call-arg]
 
     @pytest.mark.unit
     def test_rejects_too_short(self) -> None:
         with pytest.raises(ValidationError, match="8 characters"):
-            UpdatePasswordRequest(new_password="Sh0rt!")
+            UpdatePasswordRequest(current_password="OldPass1!", new_password="Sh0rt!")
 
     @pytest.mark.unit
     def test_rejects_no_uppercase(self) -> None:
         with pytest.raises(ValidationError, match="uppercase"):
-            UpdatePasswordRequest(new_password="nouppercase1!")
+            UpdatePasswordRequest(
+                current_password="OldPass1!", new_password="nouppercase1!"
+            )
 
     @pytest.mark.unit
     def test_rejects_no_digit(self) -> None:
         with pytest.raises(ValidationError, match="number"):
-            UpdatePasswordRequest(new_password="NoDigits!")
+            UpdatePasswordRequest(
+                current_password="OldPass1!", new_password="NoDigits!"
+            )
 
     @pytest.mark.unit
     def test_rejects_no_special_char(self) -> None:
         with pytest.raises(ValidationError, match="special"):
-            UpdatePasswordRequest(new_password="NoSpecial1")
+            UpdatePasswordRequest(
+                current_password="OldPass1!", new_password="NoSpecial1"
+            )
 
 
 class TestGetMe:

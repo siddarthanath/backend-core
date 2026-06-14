@@ -39,6 +39,15 @@ def get_rate_limit_key(request: Request) -> str:
     return get_remote_address(request)
 
 
+# DEPLOYMENT NOTE: storage is in-memory by default. That means each worker
+# process keeps its OWN counters — run N uvicorn/gunicorn workers and the
+# effective limit is roughly N× the configured value, and every restart resets
+# all counts. Fine for a single-process dev server; for multi-process production
+# point slowapi at a shared store by passing storage_uri, e.g.:
+#     Limiter(key_func=get_rate_limit_key,
+#             default_limits=[app_settings.RATE_LIMIT_DEFAULT],
+#             storage_uri=app_settings.REDIS_URL)
+# See docs/DEPLOYMENT.md.
 limiter = Limiter(
     key_func=get_rate_limit_key,
     default_limits=[app_settings.RATE_LIMIT_DEFAULT],

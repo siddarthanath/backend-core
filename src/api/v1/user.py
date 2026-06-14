@@ -16,21 +16,18 @@ from src.core.dependencies import (
     OrgSvc,
     UserSvc,
 )
+from src.core.exceptions.types import AppValidationError
 from src.core.middleware.rate_limit import limiter
 from src.schemas.common import MessageResponse
 from src.schemas.user.requests import (
     DeleteAccountRequest,
-    RequestPasswordResetRequest,
-    UpdateEmailRequest,
     UpdatePasswordRequest,
     UpdateProfileRequest,
 )
 from src.schemas.user.responses import UserMeResponse, build_user_me_response
-from src.utils.logging import get_logger
 
 # ────────────────────────────────────────────────────── Code ──────────────────────────────────────────────────────── #
 
-log = get_logger(__name__)
 router = APIRouter(prefix="/user", tags=["User"])
 
 
@@ -82,41 +79,40 @@ async def update_profile(
     return build_user_me_response(user, orgs)
 
 
-@router.post("/reset-password", response_model=MessageResponse)
-@limiter.limit("5/minute")
-# Intentionally unauthenticated — caller doesn't have a token yet (forgot password flow)
-async def request_password_reset(
-    request: Request,
-    body: RequestPasswordResetRequest,
-    auth_service: AuthSvc,
-) -> MessageResponse:
-    """Trigger a Supabase password reset email. Always returns success to prevent email enumeration."""
-    try:
-        await auth_service.send_password_reset(body.email)
-    except Exception as e:
-        # Swallow all errors — a different response code for unknown emails would
-        # let attackers enumerate which addresses are registered (email enumeration).
-        log.warning("password_reset.failed", error=str(e))
-    return MessageResponse(
-        message="If that email exists, we've sent a reset link.",
-        detail="Check your inbox.",
-    )
+# PASSWORD RESET is handled entirely on the frontend via
+# supabase.auth.resetPasswordForEmail — Supabase sends the email and hosts the
+# reset flow. There is intentionally no backend endpoint for it: a server-side
+# admin.generate_link() only mints a link, it does not send mail, so a backend
+# endpoint would silently no-op without a transactional email provider wired in.
 
 
-@router.put("/email", response_model=MessageResponse)
-@limiter.limit("10/minute")
-async def update_email(
-    request: Request,
-    body: UpdateEmailRequest,
-    user_id: CurrentUserID,
-    auth_service: AuthSvc,
-) -> MessageResponse:
-    """Initiate an email change via the Supabase admin API."""
-    await auth_service.update_email(user_id, str(body.new_email))
-    return MessageResponse(
-        message="Email update initiated.",
-        detail="Check your new address for a confirmation link.",
-    )
+# EMAIL CHANGE — intentionally disabled in this template (see SecuritySection.tsx).
+# Email is treated as fixed (as for OAuth accounts). Re-enabling safely requires:
+#   1. A transactional email provider (e.g. Resend) to confirm the NEW address
+#      before the change applies.
+#   2. Server-side re-authentication of the current password (same pattern as
+#      update_password below) — a stolen JWT must not be able to swap the email
+#      and seize the account.
+#   3. Syncing user_profiles.email alongside the Supabase auth update so the
+#      app-level row and the auth row never diverge.
+# AuthService.update_email is left in place as the building block for (3).
+#
+# @router.put("/email", response_model=MessageResponse)
+# @limiter.limit("10/minute")
+# async def update_email(
+#     request: Request,
+#     body: UpdateEmailRequest,
+#     claims: CurrentUserClaims,
+#     auth_service: AuthSvc,
+# ) -> MessageResponse:
+#     """Initiate an email change via the Supabase admin API."""
+#     if not await auth_service.verify_password(claims.email, body.current_password):
+#         raise AppValidationError("Current password is incorrect")
+#     await auth_service.update_email(uuid.UUID(claims.sub), str(body.new_email))
+#     return MessageResponse(
+#         message="Email update initiated.",
+#         detail="Check your new address for a confirmation link.",
+#     )
 
 
 @router.put("/password", response_model=MessageResponse)
@@ -124,11 +120,24 @@ async def update_email(
 async def update_password(
     request: Request,
     body: UpdatePasswordRequest,
-    user_id: CurrentUserID,
+    claims: CurrentUserClaims,
     auth_service: AuthSvc,
 ) -> MessageResponse:
-    """Update the authenticated user's password via the Supabase admin API."""
-    await auth_service.update_password(user_id, body.new_password)
+    """Update the authenticated user's password via the Supabase admin API.
+
+    Re-authenticates with the current password first. A valid JWT alone must not be
+    enough to rotate the password — otherwise a stolen token grants full account
+    takeover. The current-password check is enforced here, server-side, not just in
+    the UI (which an attacker calling the API directly would bypass).
+    """
+    if not await auth_service.verify_password(claims.email, body.current_password):
+        # detail tags WHICH field failed so the frontend can attribute the error
+        # to the current-password field — a new-password strength failure would
+        # also surface as VALIDATION_ERROR but without this detail.
+        raise AppValidationError(
+            "Current password is incorrect", detail="current_password"
+        )
+    await auth_service.update_password(uuid.UUID(claims.sub), body.new_password)
     return MessageResponse(message="Password updated successfully.")
 
 

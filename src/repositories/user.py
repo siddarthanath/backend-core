@@ -8,9 +8,10 @@ import uuid
 # Third-Party Library
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
 
 # Private Library
-from src.core.exceptions.types import AccountDeletedError
+from src.core.exceptions.types import AccountDeletedError, ConflictError
 from src.models.user import UserProfile
 from src.repositories.base import BaseRepository
 
@@ -67,7 +68,20 @@ class UserRepository(BaseRepository[UserProfile]):
             .values(**values)
             .on_conflict_do_nothing(index_elements=["id"])
         )
-        await self.session.execute(stmt)
+        try:
+            # Savepoint isolates the insert. on_conflict_do_nothing(id) silently
+            # absorbs same-UUID retries, so the ONLY IntegrityError that can reach
+            # here is the email partial-unique index firing — i.e. an ACTIVE profile
+            # already owns this email under a *different* Supabase UUID. The savepoint
+            # rolls back just this insert, leaving the request transaction usable.
+            async with self.session.begin_nested():
+                await self.session.execute(stmt)
+        except IntegrityError as exc:
+            # Reachable via an interrupted account deletion, or OAuth + email signups
+            # when Supabase account-linking is off. Surface a clean 409 instead of a
+            # raw 500 that would lock the user out of the app with no explanation.
+            raise ConflictError("Account", "email", email) from exc
+
         result = await self.get_by_id(user_id)
         # ON CONFLICT DO NOTHING fires when a soft-deleted user re-logs in —
         # the insert is skipped but get_by_id returns None because _not_deleted() filters it.
